@@ -16,9 +16,11 @@ from toshiba_ac.amqp_api import ToshibaAcAmqpApi
 from toshiba_ac.fcu_state import ToshibaAcFcuState
 
 from azure.iot.device import Message
+import asyncio
 
 class ToshibaAcDevice:
     HOST_NAME = 'toshibasmaciothubprod.azure-devices.net'
+    PERIODIC_STATE_RELOAD_PERIOD = 60 * 10
 
     def __init__(self, name, device_id, ac_id, ac_unique_id, amqp_api, http_api):
         self.name = name
@@ -29,10 +31,21 @@ class ToshibaAcDevice:
         self.http_api = http_api
         self.fcu_state = None
 
-    async def init(self):
+    async def connect(self):
+        self.periodic_reload_state_task = asyncio.get_event_loop().create_task(self.periodic_state_reload())
+
+    async def shutdown(self):
+        self.periodic_reload_state_task.cancel()
+
+    async def state_reload(self):
         hex_state = await self.http_api.get_device_state(self.ac_id)
         self.fcu_state = ToshibaAcFcuState.from_hex_state(hex_state)
         print(f'[{self.name}] Current state: {self.fcu_state}')
+
+    async def periodic_state_reload(self):
+        while True:
+            await self.state_reload()
+            await asyncio.sleep(self.PERIODIC_STATE_RELOAD_PERIOD)
 
     def handle_cmd_fcu_from_ac(self, payload):
         new_state = ToshibaAcFcuState.from_hex_state(payload['data'])

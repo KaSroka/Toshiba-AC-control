@@ -47,7 +47,7 @@ class ToshibaAcDeviceManager:
                     self.amqp_api,self.http_api
                 )
 
-                await device.init()
+                await device.connect()
                 await self.http_api.get_device_state(device_info.ac_id)
 
                 self.devices[device.ac_unique_id] = device
@@ -61,4 +61,5 @@ class ToshibaAcDeviceManager:
         self.devices[source_id].handle_cmd_heartbeat(payload)
 
     async def shutdown(self):
+        await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
         await self.amqp_api.shutdown()
