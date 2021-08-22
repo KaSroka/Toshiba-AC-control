@@ -8,5 +8,5 @@ setup(name='toshiba-ac',
       author='Kamil Sroka',
       author_email='kamilsroka92@gmail.com',
       packages=['toshiba_ac'],
-      install_requires=['azure-iot-device'],
+      install_requires=['azure-iot-device', 'httpx'],
      )

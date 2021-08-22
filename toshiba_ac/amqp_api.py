@@ -17,13 +17,11 @@ from azure.iot.device.aio import IoTHubDeviceClient
 class ToshibaAcAmqpApi:
     COMMANDS = ['CMD_FCU_FROM_AC', 'CMD_HEARTBEAT']
 
-    def __init__(self, host_name, device_id, shared_key):
-        self._host_name = host_name
-        self._device_id = device_id
-        self._shared_key = shared_key
-        self._connection_string = f'HostName={host_name};DeviceId={device_id};SharedAccessKey={shared_key}'
+    def __init__(self, sas_token=None):
+        self.sas_token = sas_token
         self.handlers = {}
-        self.device = IoTHubDeviceClient.create_from_connection_string(self._connection_string)
+
+        self.device = IoTHubDeviceClient.create_from_sastoken(self.sas_token)
         self.device.on_method_request_received = self.method_request_received
 
     def connect(self):

@@ -16,7 +16,7 @@ import asyncio
 import os
 import sys
 
-from toshiba_ac.device import ToshibaAcDevice
+from toshiba_ac.device_manager import ToshibaAcDeviceManager
 from toshiba_ac.fcu_state import ToshibaAcFcuState
 
 async def ainput(string: str) -> str:
@@ -26,32 +26,37 @@ async def ainput(string: str) -> str:
             None, lambda: sys.stdin.readline().strip('\n'))
 
 async def main():
-    device_id = os.environ['TOSHIBA_DEVICE_ID']
-    ac_id = os.environ['TOSHIBA_AC_ID']
-    shared_access_key = os.environ['TOSHIBA_SHARED_ACCESS_KEY']
+    user = os.environ['TOSHIBA_USER']
+    password = os.environ['TOSHIBA_PASS']
 
-    device = ToshibaAcDevice(device_id, shared_access_key, ac_id)
+    device_manager = ToshibaAcDeviceManager(user, password)
 
-    await device.connect()
+    await device_manager.connect()
 
-    print(f'Connected to AC')
+    try:
 
-    async def simple_cli():
-        while True:
-            selection = await ainput("Press Q to quit, on/off to control AC power\n")
+        devices = await device_manager.get_devices()
 
-            if selection == "Q" or selection == "q":
-                print("Quitting...")
-                return
+        device, *_ = devices.values()
 
-            elif selection == 'off':
-                await device.set_ac_status(ToshibaAcFcuState.AcStatus.OFF)
+        async def simple_cli():
+            while True:
+                selection = await ainput(f'Controlling device {device.name}\nPress Q to quit, on/off to control AC power\n')
 
-            elif selection == 'on':
-                await device.set_ac_status(ToshibaAcFcuState.AcStatus.ON)
+                if selection == "Q" or selection == "q":
+                    print("Quitting...")
+                    return
 
-    await simple_cli()
-    await device.shutdown()
+                elif selection == 'off':
+                    await device.set_ac_status(ToshibaAcFcuState.AcStatus.OFF)
+
+                elif selection == 'on':
+                    await device.set_ac_status(ToshibaAcFcuState.AcStatus.ON)
+
+        await simple_cli()
+
+    finally:
+        await device_manager.shutdown()
 
 
 if __name__ == "__main__":

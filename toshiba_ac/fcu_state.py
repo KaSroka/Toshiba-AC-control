@@ -19,7 +19,7 @@ _NONE_VAL = 0xff
 
 class ToshibaAcFcuState:
 
-    class IntValue:        
+    class IntValue:
         def __init__(self, val):
             if isinstance(val, ToshibaAcFcuState.IntValue):
                 self.name = val.name
@@ -45,7 +45,7 @@ class ToshibaAcFcuState:
             return self._value
 
         def __str__(self):
-            return f'{self.name}'      
+            return f'{self.name}'
 
     class AcStatus(Enum):
         ON = 0x30
@@ -86,9 +86,9 @@ class ToshibaAcFcuState:
         NONE = _NONE_VAL
 
     @classmethod
-    def from_hexstring(cls, hexstring):
+    def from_hex_state(cls, hex_state):
         state = cls()
-        state.decode(hexstring)
+        state.decode(hex_state)
         return state
 
     def __init__(self):
@@ -103,12 +103,12 @@ class ToshibaAcFcuState:
         data = (self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None))
         return struct.pack('BBBBBBBBBBBBBBBBBBB', *[prop.value for prop in data]).hex()
 
-    def decode(self, hexstring):
-        data = struct.unpack('BBBBBBBBBBBBBBBBBBB', bytes.fromhex(hexstring))
+    def decode(self, hex_state):
+        data = struct.unpack('BBBBBBBBBBBBBBBBBBB', bytes.fromhex(hex_state))
         self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, *_ = data
 
-    def update(self, hexstring):
-        state_update = ToshibaAcFcuState.from_hexstring(hexstring)
+    def update(self, hex_state):
+        state_update = ToshibaAcFcuState.from_hex_state(hex_state)
 
         if state_update.ac_status != ToshibaAcFcuState.AcStatus.NONE:
             self.ac_status = state_update.ac_status

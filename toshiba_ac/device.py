@@ -20,40 +20,39 @@ from azure.iot.device import Message
 class ToshibaAcDevice:
     HOST_NAME = 'toshibasmaciothubprod.azure-devices.net'
 
-    def __init__(self, device_id, shared_key, ac_unique_id):
+    def __init__(self, name, device_id, ac_id, ac_unique_id, amqp_api, http_api):
+        self.name = name
         self.device_id = device_id
-        self.shared_key = shared_key
+        self.ac_id = ac_id
         self.ac_unique_id = ac_unique_id
-        self.amqp_api = ToshibaAcAmqpApi(self.HOST_NAME, self.device_id, self.shared_key)
-        self.amqp_api.register_command_handler('CMD_FCU_FROM_AC', self.handle_cmd_fcu_from_ac)
-        self.amqp_api.register_command_handler('CMD_HEARTBEAT', self.handle_cmd_heartbeat)
-        self.fcu_state = ToshibaAcFcuState()
+        self.amqp_api = amqp_api
+        self.http_api = http_api
+        self.fcu_state = None
 
-    def connect(self):
-        return self.amqp_api.connect()
+    async def init(self):
+        hex_state = await self.http_api.get_device_state(self.ac_id)
+        self.fcu_state = ToshibaAcFcuState.from_hex_state(hex_state)
+        print(f'[{self.name}] Current state: {self.fcu_state}')
 
-    def shutdown(self):
-        return self.amqp_api.shutdown()
-
-    def handle_cmd_fcu_from_ac(self, source_id, message_id, target_id, payload, timestamp):
-        new_state = ToshibaAcFcuState.from_hexstring(payload['data'])
-        print(f'Received state update: {new_state}')
+    def handle_cmd_fcu_from_ac(self, payload):
+        new_state = ToshibaAcFcuState.from_hex_state(payload['data'])
+        print(f'[{self.name}] Received state update: {new_state}')
         self.fcu_state.update(payload['data'])
-        print(f'Current state: {self.fcu_state}')
+        print(f'[{self.name}] Current state: {self.fcu_state}')
 
-    def handle_cmd_heartbeat(self, source_id, message_id, target_id, payload, timestamp):
+    def handle_cmd_heartbeat(self, payload):
         hb_data = {k : int(v, base=16) for k, v in payload.items()}
-        print(f'Received heartbeat: {hb_data}')
+        print(f'[{self.name}] Received heartbeat: {hb_data}')
 
-    def create_cmd_fcu_to_ac(self, hexstring):
+    def create_cmd_fcu_to_ac(self, hex_state):
         return {
             'sourceId': self.device_id,
             'messageId': '0000000',
             'targetId': [self.ac_unique_id],
             'cmd': 'CMD_FCU_TO_AC',
-            'payload': {'data': hexstring},
+            'payload': {'data': hex_state},
             'timeStamp': '0000000'
-            }
+        }
 
     @property
     def ac_status(self):
