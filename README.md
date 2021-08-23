@@ -14,15 +14,15 @@ This software allows to control Toshiba AC
     `pip3 install -e .`
 
 ## Sample script
-Sample script `test_cli.py` was created to demonstrate usage of this package. It allows to turn on/off the AC and shows reported status updates.
+Sample GUI application `toshiba_ac_gui.py` was created to demonstrate usage of this package. It allows to switch basic functionalities of the AC and shows current status.
 
 It requires to provide env variables with login information:
 ```
-TOSHIBA_USER=<USER_NAME> TOSHIBA_PASS=<PASSWORD> python3 test_cli.py
+TOSHIBA_USER=<USER_NAME> TOSHIBA_PASS=<PASSWORD> python3 toshiba_ac_gui.py
 ```
 or
 ```
 export TOSHIBA_USER=<USER_NAME>
 export TOSHIBA_PASS=<PASSWORD>
-python3 test_cli.py
+python3 toshiba_ac_gui.py
 ```

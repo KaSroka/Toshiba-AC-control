@@ -14,6 +14,10 @@
 
 from azure.iot.device.aio import IoTHubDeviceClient
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ToshibaAcAmqpApi:
     COMMANDS = ['CMD_FCU_FROM_AC', 'CMD_HEARTBEAT']
 
@@ -24,11 +28,11 @@ class ToshibaAcAmqpApi:
         self.device = IoTHubDeviceClient.create_from_sastoken(self.sas_token)
         self.device.on_method_request_received = self.method_request_received
 
-    def connect(self):
-        return self.device.connect()
+    async def connect(self):
+        await self.device.connect()
 
-    def shutdown(self):
-        return self.device.shutdown()
+    async def shutdown(self):
+        await self.device.shutdown()
 
     def register_command_handler(self, command, handler):
         if command not in self.COMMANDS:
@@ -37,17 +41,16 @@ class ToshibaAcAmqpApi:
 
     def method_request_received(self, method_data):
         if method_data.name != 'smmobile':
-            raise AttributeError(f'Unknown method name: {method_data.name} full data: {method_data.payload}')
+            return logger.info(f'Unknown method name: {method_data.name} full data: {method_data.payload}')
 
         data = method_data.payload
-
-        handler = self.handlers.get(data['cmd'], None)
+        command = data['cmd']
+        handler = self.handlers.get(command, None)
 
         if handler:
             handler(data['sourceId'], data['messageId'], data['targetId'], data['payload'], data['timeStamp'])
         else:
-            pass
-            # log unhandled message
+            logger.info(f'Unhandled command {command} with payload: {data["payload"]}')
 
     def send_message(self, message):
         return self.device.send_message(message)

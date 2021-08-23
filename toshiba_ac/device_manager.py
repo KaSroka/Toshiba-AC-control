@@ -52,7 +52,7 @@ class ToshibaAcDeviceManager:
 
                 self.devices[device.ac_unique_id] = device
 
-        return self.devices
+        return list(self.devices.values())
 
     def handle_cmd_fcu_from_ac(self, source_id, message_id, target_id, payload, timestamp):
         self.devices[source_id].handle_cmd_fcu_from_ac(payload)
@@ -62,4 +62,5 @@ class ToshibaAcDeviceManager:
 
     async def shutdown(self):
         await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
-        await self.amqp_api.shutdown()
+        if self.amqp_api:
+            await self.amqp_api.shutdown()
