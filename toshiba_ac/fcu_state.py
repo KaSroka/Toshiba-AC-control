@@ -116,7 +116,7 @@ class ToshibaAcFcuState:
         if state_update.ac_mode != ToshibaAcFcuState.AcMode.NONE:
             self.ac_mode = state_update.ac_mode
 
-        if state_update.ac_temperature != None:
+        if state_update.ac_temperature.name != None:
             self.ac_temperature = state_update.ac_temperature
 
         if state_update.ac_fan_mode != ToshibaAcFcuState.AcFanMode.NONE:
