@@ -60,17 +60,28 @@ class App(tk.Tk):
         self.populate_device_tab_enum(dev_tab, 'ac_mode', ToshibaAcFcuState.AcMode, dev_tab.device.set_ac_mode, 1)
 
         dev_tab.ac_temperature = tk.StringVar()
+        dev_tab.ac_indoor_temperature = tk.StringVar()
+        dev_tab.ac_outdoor_temperature = tk.StringVar()
 
         temp_req = tk.IntVar()
 
         temp_label = ttk.Label(dev_tab.tab, textvariable=dev_tab.ac_temperature)
         temp_label.grid(column=0, row=2, padx=5, pady=0)
+
         temp_sb = ttk.Spinbox(dev_tab.tab,
                               textvariable=temp_req,
                               from_=17, to=30,
                               width=7)
         temp_sb.grid(column=1, row=2, padx=0, pady=0)
+
+        temp_i_label = ttk.Label(dev_tab.tab, textvariable=dev_tab.ac_indoor_temperature)
+        temp_i_label.grid(column=2, row=2, padx=5, pady=0)
+
+        temp_o_label = ttk.Label(dev_tab.tab, textvariable=dev_tab.ac_outdoor_temperature)
+        temp_o_label.grid(column=3, row=2, padx=5, pady=0)
+
         temp_req.set(dev_tab.device.ac_temperature.name)
+
         temp_req.trace_add('write', lambda *_: self.loop.create_task(dev_tab.device.set_ac_temperature(temp_req.get())))
 
 
@@ -82,6 +93,8 @@ class App(tk.Tk):
         dev_tab.ac_status.set(f'Pwer: {dev_tab.device.ac_status.name.title()}')
         dev_tab.ac_mode.set(f'Mode: {dev_tab.device.ac_mode.name.title()}')
         dev_tab.ac_temperature.set(f'Temperature: {dev_tab.device.ac_temperature.name}')
+        dev_tab.ac_indoor_temperature.set(f'Indoor: {dev_tab.device.ac_indoor_temperature.name}')
+        dev_tab.ac_outdoor_temperature.set(f'Outdoor: {dev_tab.device.ac_outdoor_temperature.name}')
         dev_tab.ac_fan_mode.set(f'Fan mode: {dev_tab.device.ac_fan_mode.name.title().replace("_", " ")}')
 
     def dev_state_changed(self, dev):

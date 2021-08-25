@@ -95,17 +95,19 @@ class ToshibaAcFcuState:
         self.ac_status = ToshibaAcFcuState.AcStatus.NONE
         self.ac_mode = ToshibaAcFcuState.AcMode.NONE
         self.ac_temperature = ToshibaAcFcuState.IntValue(None)
+        self.ac_indoor_temperature = ToshibaAcFcuState.IntValue(None)
+        self.ac_outdoor_temperature = ToshibaAcFcuState.IntValue(None)
         self.ac_fan_mode = ToshibaAcFcuState.AcFanMode.NONE
         self.ac_swing_mode = ToshibaAcFcuState.AcSwingMode.NONE
         self.ac_power_selection = ToshibaAcFcuState.AcPowerSelection.NONE
 
     def encode(self):
-        data = (self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None))
+        data = (self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, ToshibaAcFcuState.IntValue(None), self.ac_indoor_temperature, self.ac_outdoor_temperature, ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None), ToshibaAcFcuState.IntValue(None))
         return struct.pack('BBBBBBBBBBBBBBBBBBB', *[prop.value for prop in data]).hex()
 
     def decode(self, hex_state):
         data = struct.unpack('BBBBBBBBBBBBBBBBBBB', bytes.fromhex(hex_state))
-        self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, *_ = data
+        self.ac_status, self.ac_mode, self.ac_temperature, self.ac_fan_mode, self.ac_swing_mode, self.ac_power_selection, _, self.ac_indoor_temperature, self.ac_outdoor_temperature, *_ = data
 
     def update(self, hex_state):
         state_update = ToshibaAcFcuState.from_hex_state(hex_state)
@@ -118,6 +120,12 @@ class ToshibaAcFcuState:
 
         if state_update.ac_temperature.name != None:
             self.ac_temperature = state_update.ac_temperature
+
+        if state_update.ac_indoor_temperature.name != None:
+            self.ac_indoor_temperature = state_update.ac_indoor_temperature
+
+        if state_update.ac_outdoor_temperature.name != None:
+            self.ac_outdoor_temperature = state_update.ac_outdoor_temperature
 
         if state_update.ac_fan_mode != ToshibaAcFcuState.AcFanMode.NONE:
             self.ac_fan_mode = state_update.ac_fan_mode
@@ -153,6 +161,23 @@ class ToshibaAcFcuState:
         self._ac_temperature = ToshibaAcFcuState.IntValue(val)
 
     @property
+    def ac_indoor_temperature(self):
+        return self._ac_indoor_temperature
+
+    @ac_indoor_temperature.setter
+    def ac_indoor_temperature(self, val):
+        self._ac_indoor_temperature = ToshibaAcFcuState.IntValue(val)
+
+    @property
+    def ac_outdoor_temperature(self):
+        return self._ac_outdoor_temperature
+
+    @ac_outdoor_temperature.setter
+    def ac_outdoor_temperature(self, val):
+        self._ac_outdoor_temperature = ToshibaAcFcuState.IntValue(val)
+
+
+    @property
     def ac_fan_mode(self):
         return self._ac_fan_mode
 
@@ -177,4 +202,4 @@ class ToshibaAcFcuState:
         self._ac_power_selection = ToshibaAcFcuState.AcPowerSelection(val)
 
     def __str__(self):
-        return f'AcStatus: {self.ac_status}, AcMode: {self.ac_mode}, AcTemperature: {self.ac_temperature}, AcFanMode: {self.ac_fan_mode}, AcSwingMode: {self.ac_swing_mode}, AcPowerSelection: {self.ac_power_selection}'
+        return f'AcStatus: {self.ac_status}, AcMode: {self.ac_mode}, AcTemperature: {self.ac_temperature}, AcFanMode: {self.ac_fan_mode}, AcSwingMode: {self.ac_swing_mode}, AcPowerSelection: {self.ac_power_selection}, AcIndoorTemperature: {self.ac_indoor_temperature}, AcOutdoorTemperature: {self.ac_outdoor_temperature}'

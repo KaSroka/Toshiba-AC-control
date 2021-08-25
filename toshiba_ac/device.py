@@ -111,7 +111,15 @@ class ToshibaAcDevice:
     @property
     def ac_temperature(self):
         return self.fcu_state.ac_temperature
+        
+    @property
+    def ac_indoor_temperature(self):
+        return self.fcu_state.ac_indoor_temperature
 
+    @property
+    def ac_outdoor_temperature(self):
+        return self.fcu_state.ac_outdoor_temperature
+        
     async def set_ac_temperature(self, val):
         state = ToshibaAcFcuState()
         state.ac_temperature = val
