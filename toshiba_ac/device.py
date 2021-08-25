@@ -96,6 +96,12 @@ class ToshibaAcDevice:
                 if future_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.SAVE:
                     state.ac_temperature = ToshibaAcFcuState.AcTemperature(state.ac_temperature.value + 16)
 
+        if future_state.ac_mode != ToshibaAcFcuState.AcMode.HEAT:
+            state.ac_merit_b_feature = ToshibaAcFcuState.AcMeritBFeature.OFF
+
+            if future_state.ac_merit_a_feature in [ToshibaAcFcuState.AcMeritAFeature.SAVE, ToshibaAcFcuState.AcMeritAFeature.FLOOR]:
+                state.ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature.OFF
+
         command = self.create_cmd_fcu_to_ac(state.encode())
         await self.send_command_to_ac(command)
 
@@ -123,15 +129,21 @@ class ToshibaAcDevice:
     def ac_temperature(self):
         # In SAVE mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
 
+        ret = self.fcu_state.ac_temperature
+
         if self.fcu_state.ac_mode == ToshibaAcFcuState.AcMode.HEAT:
             if self.fcu_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.SAVE:
                 if self.fcu_state.ac_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
-                    return ToshibaAcFcuState.AcTemperature(self.fcu_state.ac_temperature.value - 16)
-        return self.fcu_state.ac_temperature
+                    ret = ToshibaAcFcuState.AcTemperature(self.fcu_state.ac_temperature.value - 16)
+
+        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
+            return None
+
+        return ret.value
 
     async def set_ac_temperature(self, val):
         state = ToshibaAcFcuState()
-        state.ac_temperature = val
+        state.ac_temperature = int(val)
 
         await self.send_state_to_ac(state)
 
@@ -197,11 +209,21 @@ class ToshibaAcDevice:
 
     @property
     def ac_indoor_temperature(self):
-        return self.fcu_state.ac_indoor_temperature
+        ret = self.fcu_state.ac_indoor_temperature
+
+        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
+            return None
+
+        return ret.value
 
     @property
     def ac_outdoor_temperature(self):
-        return self.fcu_state.ac_outdoor_temperature
+        ret = self.fcu_state.ac_outdoor_temperature
+
+        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
+            return None
+
+        return ret.value
 
     @property
     def ac_self_cleaning(self):

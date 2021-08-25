@@ -76,7 +76,7 @@ class App(tk.Tk):
                               from_=5, to=30,
                               width=7)
         temp_sb.grid(column=1, row=2, padx=0, pady=0)
-        temp_req.set(dev_tab.device.ac_temperature.name)
+        temp_req.set(dev_tab.device.ac_temperature)
         temp_req.trace_add('write', lambda *_: self.loop.create_task(dev_tab.device.set_ac_temperature(temp_req.get())))
 
 
@@ -111,15 +111,15 @@ class App(tk.Tk):
     def update_ac_state(self, dev_tab):
         self.update_ac_state_entry(dev_tab, 'ac_status', 'Power')
         self.update_ac_state_entry(dev_tab, 'ac_mode', 'Mode')
-        self.update_ac_state_entry(dev_tab, 'ac_temperature', 'Temperature')
+        dev_tab.ac_temperature.set(f'Temperature: {dev_tab.device.ac_temperature}')
         self.update_ac_state_entry(dev_tab, 'ac_fan_mode', 'Fan mode')
         self.update_ac_state_entry(dev_tab, 'ac_swing_mode', 'Swing mode')
         self.update_ac_state_entry(dev_tab, 'ac_power_selection', 'Power selection')
         self.update_ac_state_entry(dev_tab, 'ac_merit_b_feature', 'Merit B feature')
         self.update_ac_state_entry(dev_tab, 'ac_merit_a_feature', 'Merit A feature')
         self.update_ac_state_entry(dev_tab, 'ac_air_pure_ion', 'Pure ion')
-        self.update_ac_state_entry(dev_tab, 'ac_indoor_temperature', 'Indoor temperature')
-        self.update_ac_state_entry(dev_tab, 'ac_outdoor_temperature', 'Outdoor temperature')
+        dev_tab.ac_indoor_temperature.set(f'Indoor temperature: {dev_tab.device.ac_indoor_temperature}')
+        dev_tab.ac_outdoor_temperature.set(f'Outdoor temperature: {dev_tab.device.ac_outdoor_temperature}')
         self.update_ac_state_entry(dev_tab, 'ac_self_cleaning', 'Self cleaning')
 
     def dev_state_changed(self, dev):
