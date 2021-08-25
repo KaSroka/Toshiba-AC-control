@@ -45,26 +45,28 @@ class ToshibaAcDevice:
 
     async def state_reload(self):
         hex_state = await self.http_api.get_device_state(self.ac_id)
-        self.fcu_state.update(hex_state)
-        self.state_changed()
+        logger.debug(f'[{self.name}] AC state from HTTP: {hex_state}')
+        if self.fcu_state.update(hex_state):
+            self.state_changed()
 
     def state_changed(self):
-        logger.debug(f'[{self.name}] Current state: {self.fcu_state}')
+        logger.info(f'[{self.name}] Current state: {self.fcu_state}')
         if self.on_state_changed:
             self.on_state_changed(self)
 
     async def periodic_state_reload(self):
         while True:
-            await self.state_reload()
             await asyncio.sleep(self.PERIODIC_STATE_RELOAD_PERIOD)
+            await self.state_reload()
 
     def handle_cmd_fcu_from_ac(self, payload):
-        self.fcu_state.update(payload['data'])
-        self.state_changed()
+        logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')
+        if self.fcu_state.update(payload['data']):
+            self.state_changed()
 
     def handle_cmd_heartbeat(self, payload):
         hb_data = {k : int(v, base=16) for k, v in payload.items()}
-        logger.debug(f'[{self.name}] Received heartbeat: {hb_data}')
+        logger.debug(f'[{self.name}] AC heartbeat from AMQP: {hb_data}')
 
     def create_cmd_fcu_to_ac(self, hex_state):
         return {
@@ -85,6 +87,15 @@ class ToshibaAcDevice:
         await self.amqp_api.send_message(msg)
 
     async def send_state_to_ac(self, state):
+        future_state = ToshibaAcFcuState.from_hex_state(self.fcu_state.encode())
+        future_state.update(state.encode())
+
+        # In SAVE mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
+        if state.ac_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
+            if future_state.ac_mode == ToshibaAcFcuState.AcMode.HEAT:
+                if future_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.SAVE:
+                    state.ac_temperature = ToshibaAcFcuState.AcTemperature(state.ac_temperature.value + 16)
+
         command = self.create_cmd_fcu_to_ac(state.encode())
         await self.send_command_to_ac(command)
 
@@ -110,6 +121,12 @@ class ToshibaAcDevice:
 
     @property
     def ac_temperature(self):
+        # In SAVE mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
+
+        if self.fcu_state.ac_mode == ToshibaAcFcuState.AcMode.HEAT:
+            if self.fcu_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.SAVE:
+                if self.fcu_state.ac_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
+                    return ToshibaAcFcuState.AcTemperature(self.fcu_state.ac_temperature.value - 16)
         return self.fcu_state.ac_temperature
 
     async def set_ac_temperature(self, val):
@@ -127,3 +144,65 @@ class ToshibaAcDevice:
         state.ac_fan_mode = val
 
         await self.send_state_to_ac(state)
+
+    @property
+    def ac_swing_mode(self):
+        return self.fcu_state.ac_swing_mode
+
+    async def set_ac_swing_mode(self, val):
+        state = ToshibaAcFcuState()
+        state.ac_swing_mode = val
+
+        await self.send_state_to_ac(state)
+
+    @property
+    def ac_power_selection(self):
+        return self.fcu_state.ac_power_selection
+
+    async def set_ac_power_selection(self, val):
+        state = ToshibaAcFcuState()
+        state.ac_power_selection = val
+
+        await self.send_state_to_ac(state)
+
+    @property
+    def ac_merit_b_feature(self):
+        return self.fcu_state.ac_merit_b_feature
+
+    async def set_ac_merit_b_feature(self, val):
+        state = ToshibaAcFcuState()
+        state.ac_merit_b_feature = val
+
+        await self.send_state_to_ac(state)
+
+    @property
+    def ac_merit_a_feature(self):
+        return self.fcu_state.ac_merit_a_feature
+
+    async def set_ac_merit_a_feature(self, val):
+        state = ToshibaAcFcuState()
+        state.ac_merit_a_feature = val
+
+        await self.send_state_to_ac(state)
+
+    @property
+    def ac_air_pure_ion(self):
+        return self.fcu_state.ac_air_pure_ion
+
+    async def set_ac_air_pure_ion(self, val):
+        state = ToshibaAcFcuState()
+        state.ac_air_pure_ion = val
+
+        await self.send_state_to_ac(state)
+
+    @property
+    def ac_indoor_temperature(self):
+        return self.fcu_state.ac_indoor_temperature
+
+    @property
+    def ac_outdoor_temperature(self):
+        return self.fcu_state.ac_outdoor_temperature
+
+    @property
+    def ac_self_cleaning(self):
+        return self.fcu_state.ac_self_cleaning
