@@ -74,7 +74,7 @@ class ToshibaAcFcuState:
         FIREPLACE_2 = 0x03
         OFF = 0x00
         NONE = 0x0f
-    
+
     class AcMeritAFeature(Enum):
         HIGH_POWER = 0x01
         SILENT_1 = 0x02
@@ -318,7 +318,7 @@ class ToshibaAcFcuState:
     def __str__(self):
         res = f'AcStatus: {self.ac_status.name}'
         res += f', AcMode: {self.ac_mode.name}'
-        res += f', AcAcTemperature: {self.ac_temperature.name}'
+        res += f', AcTemperature: {self.ac_temperature.name}'
         res += f', AcFanMode: {self.ac_fan_mode.name}'
         res += f', AcSwingMode: {self.ac_swing_mode.name}'
         res += f', AcPowerSelection: {self.ac_power_selection.name}'

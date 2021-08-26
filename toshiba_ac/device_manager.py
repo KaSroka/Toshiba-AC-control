@@ -18,6 +18,9 @@ from toshiba_ac.device import ToshibaAcDevice
 
 import asyncio
 
+import logging
+logger = logging.getLogger(__name__)
+
 class ToshibaAcDeviceManager:
     def __init__(self, user, password):
         self.http_api = ToshibaAcHttpApi(user, password)
@@ -39,6 +42,9 @@ class ToshibaAcDeviceManager:
         # TODO handle refresh
         if not self.devices:
             devices_info = await self.http_api.get_devices()
+
+            logger.debug(f'Found devices: {devices_info}')
+
             for device_info in devices_info:
                 device = ToshibaAcDevice(device_info.ac_name,
                     self.reg_info.device_id,
@@ -49,6 +55,8 @@ class ToshibaAcDeviceManager:
 
                 await device.connect()
                 await self.http_api.get_device_state(device_info.ac_id)
+
+                logger.debug(f'Adding device {device!r}')
 
                 self.devices[device.ac_unique_id] = device
 

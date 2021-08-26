@@ -2,6 +2,10 @@
 This software allows to control Toshiba AC
 
 ## Instalation
+### Typical instalation
+Download using pip
+`pip3 install toshiba-ac`
+### Instalation for development
 1. Download or clone this repository to desired directory:
 
     `git clone https://github.com/KaSroka/Toshiba-AC-control.git`

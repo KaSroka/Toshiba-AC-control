@@ -102,6 +102,8 @@ class ToshibaAcDevice:
             if future_state.ac_merit_a_feature in [ToshibaAcFcuState.AcMeritAFeature.SAVE, ToshibaAcFcuState.AcMeritAFeature.FLOOR]:
                 state.ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature.OFF
 
+        logger.debug(f'[{self.name}] Sending command: {state}')
+
         command = self.create_cmd_fcu_to_ac(state.encode())
         await self.send_command_to_ac(command)
 
@@ -228,3 +230,6 @@ class ToshibaAcDevice:
     @property
     def ac_self_cleaning(self):
         return self.fcu_state.ac_self_cleaning
+
+    def __repr__(self):
+        return f'ToshibaAcDevice(name={self.name}, device_id={self.device_id}, ac_id={self.ac_id}, ac_unique_id={self.ac_unique_id})'
