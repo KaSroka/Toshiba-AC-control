@@ -102,6 +102,10 @@ class ToshibaAcDevice:
             if future_state.ac_merit_a_feature in [ToshibaAcFcuState.AcMeritAFeature.SAVE, ToshibaAcFcuState.AcMeritAFeature.FLOOR]:
                 state.ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature.OFF
 
+        # If we are requesting to turn on, we have to clear self cleaning flag
+        if state.ac_status == ToshibaAcFcuState.AcStatus.ON and self.fcu_state.ac_self_cleaning == ToshibaAcFcuState.AcSelfCleaning.ON:
+            state.ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning.OFF
+
         logger.debug(f'[{self.name}] Sending command: {state}')
 
         command = self.create_cmd_fcu_to_ac(state.encode())
