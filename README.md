@@ -13,6 +13,10 @@ Download using pip
 
     `pip3 install .`
 
+    If you want to edit the code you can install the package as editable:
+
+    `pip3 install -e .`
+
 ## Sample script
 Sample GUI application `toshiba_ac_gui.py` was created to demonstrate usage of this package. It allows to switch basic functionalities of the AC and shows current status.
 

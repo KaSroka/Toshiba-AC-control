@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class ToshibaAcAmqpApi:
     COMMANDS = ['CMD_FCU_FROM_AC', 'CMD_HEARTBEAT']
 
-    def __init__(self, sas_token=None):
+    def __init__(self, sas_token):
         self.sas_token = sas_token
         self.handlers = {}
 

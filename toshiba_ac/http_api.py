@@ -12,19 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import httpx
+import aiohttp
 from dataclasses import dataclass
 
-@dataclass
-class ToshibaAcClientInfo:
-    device_id: str
-    sas_token: str
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ToshibaAcDeviceInfo:
     ac_id: str
     ac_unique_id: str
     ac_name: str
+
+class ToshibaAcHttpApiError(Exception):
+    pass
+
+class ToshibaAcHttpApiAuthError(ToshibaAcHttpApiError):
+    pass
 
 class ToshibaAcHttpApi:
     BASE_URL = 'https://toshibamobileservice.azurewebsites.net'
@@ -39,8 +43,12 @@ class ToshibaAcHttpApi:
         self.access_token = None
         self.access_token_type = None
         self.consumer_id = None
+        self.session = None
 
     async def request_api(self, path, get=None, post=None, headers=None):
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+
         if not headers:
             headers = {}
             headers['Content-Type'] = 'application/json'
@@ -48,13 +56,28 @@ class ToshibaAcHttpApi:
 
         url = self.BASE_URL + path
 
-        async with httpx.AsyncClient() as client:
-            if post:
-                res = await client.post(url, params=get, json=post, headers=headers)
-            else:
-                res = await client.get(url, params=get, headers=headers)
+        if post:
+            method = lambda : self.session.post(url, params=get, json=post, headers=headers)
+            logger.debug(f'Sending POST to {url} with params={get}, json={post}, headers={headers}')
 
-        return res.json()['ResObj']
+        else:
+            method = lambda : self.session.get(url, params=get, headers=headers)
+            logger.debug(f'Sending GET to {url} with params={get}, headers={headers}')
+
+        async with method() as response:
+            json = await response.json()
+            logger.debug(f'Response code: {response.status}, JSON: {json}')
+
+            err_type = ToshibaAcHttpApiError
+
+            if response.status == 200:
+                if json['IsSuccess']:
+                    return json['ResObj']
+                else:
+                    if json['StatusCode'] == 'InvalidUserNameorPassword':
+                        err_type = ToshibaAcHttpApiAuthError
+
+            raise err_type(json['Message'])
 
     async def connect(self):
         headers = {'Content-Type': 'application/json'}
@@ -65,6 +88,11 @@ class ToshibaAcHttpApi:
         self.access_token = res['access_token']
         self.access_token_type = res['token_type']
         self.consumer_id = res['consumerId']
+
+    async def shutdown(self):
+        if self.session:
+            await self.session.close()
+            self.session = None
 
     async def get_devices(self):
         get = {
@@ -91,13 +119,13 @@ class ToshibaAcHttpApi:
         return res['ACStateData']
 
 
-    async def register_client(self):
+    async def register_client(self, device_id):
         post = {
-            'DeviceID': self.username + '_3e6e4eb5f0e5aa46',
+            'DeviceID': device_id,
             'DeviceType': '1',
             'Username': self.username
         }
 
         res = await self.request_api(self.REGISTER_PATH, post=post)
 
-        return ToshibaAcClientInfo(res['DeviceId'], res['SasToken'])
+        return res['SasToken']

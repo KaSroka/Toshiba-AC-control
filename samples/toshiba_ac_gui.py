@@ -27,6 +27,8 @@ import logging
 toshiba_logger = logging.getLogger('toshiba_ac')
 logging.basicConfig(level=logging.WARNING)
 toshiba_logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class DeviceTab:
     def __init__(self, device, tab):
@@ -126,8 +128,10 @@ class App(tk.Tk):
         self.loop.call_soon_threadsafe(self.update_ac_state, self.devices[dev])
 
     async def init(self):
-        self.device_manager = ToshibaAcDeviceManager(self.user, self.password)
-        await self.device_manager.connect()
+        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, '3e6e4eb5f0e5aa40')
+        sas_token = await self.device_manager.connect()
+        logger.debug(f'AMQP SAS token: {sas_token}')
+
         devices = await self.device_manager.get_devices()
 
         for device in devices:

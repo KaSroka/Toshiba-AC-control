@@ -22,35 +22,50 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ToshibaAcDeviceManager:
-    def __init__(self, user, password):
-        self.http_api = ToshibaAcHttpApi(user, password)
+    def __init__(self, username, password, device_id=None, sas_token=None):
+        self.username = username
+        self.password = password
+        self.http_api = None
         self.reg_info = None
         self.amqp_api = None
+        self.device_id = self.username + '_' + (device_id or '3e6e4eb5f0e5aa46')
+        self.sas_token = sas_token
         self.devices = {}
 
-
     async def connect(self):
-        await self.http_api.connect()
-        self.reg_info = await self.http_api.register_client()
+        if not self.http_api:
+            try:
+                self.http_api = ToshibaAcHttpApi(self.username, self.password)
 
-        self.amqp_api = ToshibaAcAmqpApi(self.reg_info.sas_token)
-        self.amqp_api.register_command_handler('CMD_FCU_FROM_AC', self.handle_cmd_fcu_from_ac)
-        self.amqp_api.register_command_handler('CMD_HEARTBEAT', self.handle_cmd_heartbeat)
-        await self.amqp_api.connect()
+                await self.http_api.connect()
 
-    async def get_devices(self, refresh=False):
-        # TODO handle refresh
+                if not self.sas_token:
+                    self.sas_token = await self.http_api.register_client(self.device_id)
+
+                self.amqp_api = ToshibaAcAmqpApi(self.sas_token)
+                self.amqp_api.register_command_handler('CMD_FCU_FROM_AC', self.handle_cmd_fcu_from_ac)
+                self.amqp_api.register_command_handler('CMD_HEARTBEAT', self.handle_cmd_heartbeat)
+                await self.amqp_api.connect()
+            except:
+                await self.shutdown()
+                raise
+
+        return self.sas_token
+
+    async def get_devices(self):
         if not self.devices:
             devices_info = await self.http_api.get_devices()
 
             logger.debug(f'Found devices: {devices_info}')
 
             for device_info in devices_info:
-                device = ToshibaAcDevice(device_info.ac_name,
-                    self.reg_info.device_id,
+                device = ToshibaAcDevice(
+                    device_info.ac_name,
+                    self.device_id,
                     device_info.ac_id,
                     device_info.ac_unique_id,
-                    self.amqp_api,self.http_api
+                    self.amqp_api,
+                    self.http_api
                 )
 
                 await device.connect()
@@ -70,5 +85,11 @@ class ToshibaAcDeviceManager:
 
     async def shutdown(self):
         await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
+
         if self.amqp_api:
             await self.amqp_api.shutdown()
+            self.amqp_api = None
+
+        if self.http_api:
+            await self.http_api.shutdown()
+            self.http_api = None
