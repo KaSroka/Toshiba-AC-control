@@ -25,7 +25,7 @@ from toshiba_ac.device_manager import ToshibaAcDeviceManager
 import logging
 
 toshiba_logger = logging.getLogger('toshiba_ac')
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.WARNING, format='[%(asctime)s] %(levelname)-8s %(name)s: %(message)s')
 toshiba_logger.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -62,8 +62,6 @@ class App(tk.Tk):
             btn.grid(column=i, row=row, padx=0, pady=0)
 
     def populate_device_tab(self, dev_tab):
-        tab = dev_tab.tab
-
         self.populate_device_tab_enum(dev_tab, 'ac_status', ToshibaAcFcuState.AcStatus, dev_tab.device.set_ac_status, 0)
         self.populate_device_tab_enum(dev_tab, 'ac_mode', ToshibaAcFcuState.AcMode, dev_tab.device.set_ac_mode, 1)
 
@@ -104,6 +102,10 @@ class App(tk.Tk):
         self_cleaning_label = ttk.Label(dev_tab.tab, textvariable=dev_tab.ac_self_cleaning)
         self_cleaning_label.grid(column=0, row=11, padx=5, pady=0)
 
+        dev_tab.ac_energy_consumption = tk.StringVar()
+
+        energy_label = ttk.Label(dev_tab.tab, textvariable=dev_tab.ac_energy_consumption)
+        energy_label.grid(column=0, row=12, padx=5, pady=0)
 
         self.update_ac_state(dev_tab)
 
@@ -123,6 +125,8 @@ class App(tk.Tk):
         dev_tab.ac_indoor_temperature.set(f'Indoor temperature: {dev_tab.device.ac_indoor_temperature}')
         dev_tab.ac_outdoor_temperature.set(f'Outdoor temperature: {dev_tab.device.ac_outdoor_temperature}')
         self.update_ac_state_entry(dev_tab, 'ac_self_cleaning', 'Self cleaning')
+        if dev_tab.device.ac_energy_consumption:
+            dev_tab.ac_energy_consumption.set(f'Energy used {dev_tab.device.ac_energy_consumption.energy_wh}Wh since {dev_tab.device.ac_energy_consumption.since}')
 
     def dev_state_changed(self, dev):
         self.loop.call_soon_threadsafe(self.update_ac_state, self.devices[dev])

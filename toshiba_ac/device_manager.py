@@ -22,6 +22,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ToshibaAcDeviceManager:
+    PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD = 60 * 10
+
     def __init__(self, username, password, device_id=None, sas_token=None):
         self.username = username
         self.password = password
@@ -31,6 +33,7 @@ class ToshibaAcDeviceManager:
         self.device_id = self.username + '_' + (device_id or '3e6e4eb5f0e5aa46')
         self.sas_token = sas_token
         self.devices = {}
+        self.periodic_fetch_energy_consumption_task = None
 
     async def connect(self):
         if not self.http_api:
@@ -46,11 +49,37 @@ class ToshibaAcDeviceManager:
                 self.amqp_api.register_command_handler('CMD_FCU_FROM_AC', self.handle_cmd_fcu_from_ac)
                 self.amqp_api.register_command_handler('CMD_HEARTBEAT', self.handle_cmd_heartbeat)
                 await self.amqp_api.connect()
+
             except:
                 await self.shutdown()
                 raise
 
         return self.sas_token
+
+    async def shutdown(self):
+        if self.periodic_fetch_energy_consumption_task:
+            self.periodic_fetch_energy_consumption_task.cancel()
+
+        await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
+
+        if self.amqp_api:
+            await self.amqp_api.shutdown()
+            self.amqp_api = None
+
+        if self.http_api:
+            await self.http_api.shutdown()
+            self.http_api = None
+
+    async def periodic_fetch_energy_consumption(self):
+        while True:
+            consumptions = await self.http_api.get_devices_energy_consumption([ac_unique_id for ac_unique_id in self.devices.keys()])
+
+            logger.debug(f'Power consumption for devices: {consumptions}')
+
+            for ac_unique_id, consumption in consumptions.items():
+                self.devices[ac_unique_id].handle_update_ac_energy_consumption(consumption)
+
+            await asyncio.sleep(self.PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD)
 
     async def get_devices(self):
         if not self.devices:
@@ -79,6 +108,9 @@ class ToshibaAcDeviceManager:
 
             await asyncio.gather(*connects)
 
+            if not self.periodic_fetch_energy_consumption_task:
+                self.periodic_fetch_energy_consumption_task = asyncio.get_event_loop().create_task(self.periodic_fetch_energy_consumption())
+
         return list(self.devices.values())
 
     def handle_cmd_fcu_from_ac(self, source_id, message_id, target_id, payload, timestamp):
@@ -86,14 +118,3 @@ class ToshibaAcDeviceManager:
 
     def handle_cmd_heartbeat(self, source_id, message_id, target_id, payload, timestamp):
         self.devices[source_id].handle_cmd_heartbeat(payload)
-
-    async def shutdown(self):
-        await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
-
-        if self.amqp_api:
-            await self.amqp_api.shutdown()
-            self.amqp_api = None
-
-        if self.http_api:
-            await self.http_api.shutdown()
-            self.http_api = None

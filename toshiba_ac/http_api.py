@@ -15,8 +15,12 @@
 import aiohttp
 from dataclasses import dataclass
 
+import datetime
+
 import logging
 logger = logging.getLogger(__name__)
+
+from toshiba_ac.device import ToshibaAcDeviceEnergyConsumption
 
 @dataclass
 class ToshibaAcDeviceInfo:
@@ -37,6 +41,7 @@ class ToshibaAcHttpApi:
     REGISTER_PATH = '/api/Consumer/RegisterMobileDevice'
     AC_MAPPING_PATH = '/api/AC/GetConsumerACMapping'
     AC_STATE_PATH = '/api/AC/GetCurrentACState'
+    AC_ENERGY_CONSUMPTION_PATH = '/api/AC/GetGroupACEnergyConsumption'
 
     def __init__(self, username, password):
         self.username = username
@@ -119,6 +124,27 @@ class ToshibaAcHttpApi:
 
         return res['ACStateData']
 
+    async def get_devices_energy_consumption(self, ac_unique_ids):
+        year = int(datetime.datetime.now().year)
+        iso_since = datetime.datetime(year, 1, 1).astimezone(datetime.timezone.utc).isoformat()
+
+        post = {
+            'ACDeviceUniqueIdList': ac_unique_ids,
+            'FromUtcTime': str(year),
+            'Timezone': 'UTC',
+            'ToUtcTime': str(year + 1),
+            'Type': 'EnergyYear'
+        }
+
+        res = await self.request_api(self.AC_ENERGY_CONSUMPTION_PATH, post=post)
+
+        ret = {}
+
+        for ac in res:
+            consumption = sum(int(consumption['Energy']) for consumption in ac['EnergyConsumption'])
+            ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(consumption, iso_since)
+
+        return ret
 
     async def register_client(self, device_id):
         post = {

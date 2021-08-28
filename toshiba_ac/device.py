@@ -16,11 +16,17 @@ from toshiba_ac.amqp_api import ToshibaAcAmqpApi
 from toshiba_ac.fcu_state import ToshibaAcFcuState
 
 from azure.iot.device import Message
+from dataclasses import dataclass
 import asyncio
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class ToshibaAcDeviceEnergyConsumption:
+    energy_wh: float
+    since: str
 
 class ToshibaAcDevice:
     PERIODIC_STATE_RELOAD_PERIOD = 60 * 10
@@ -34,6 +40,7 @@ class ToshibaAcDevice:
         self.http_api = http_api
         self.fcu_state = ToshibaAcFcuState()
         self.on_state_changed = None
+        self._ac_energy_consumption = None
 
         if self.fcu_state.update(initial_ac_state):
             self.state_changed()
@@ -235,6 +242,19 @@ class ToshibaAcDevice:
     @property
     def ac_self_cleaning(self):
         return self.fcu_state.ac_self_cleaning
+
+    @property
+    def ac_energy_consumption(self):
+        return self._ac_energy_consumption
+
+    def handle_update_ac_energy_consumption(self, val):
+        if self._ac_energy_consumption != val:
+            self._ac_energy_consumption = val
+
+            logger.debug(f'[{self.name}] Energy consumption: {val}')
+
+            if self.on_state_changed:
+                self.on_state_changed(self)
 
     def __repr__(self):
         return f'ToshibaAcDevice(name={self.name}, device_id={self.device_id}, ac_id={self.ac_id}, ac_unique_id={self.ac_unique_id})'
