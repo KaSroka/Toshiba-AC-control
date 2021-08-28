@@ -58,22 +58,26 @@ class ToshibaAcDeviceManager:
 
             logger.debug(f'Found devices: {devices_info}')
 
+            connects = []
+
             for device_info in devices_info:
                 device = ToshibaAcDevice(
                     device_info.ac_name,
                     self.device_id,
                     device_info.ac_id,
                     device_info.ac_unique_id,
+                    device_info.initial_ac_state,
                     self.amqp_api,
                     self.http_api
                 )
 
-                await device.connect()
-                await self.http_api.get_device_state(device_info.ac_id)
+                connects.append(device.connect())
 
                 logger.debug(f'Adding device {device!r}')
 
                 self.devices[device.ac_unique_id] = device
+
+            await asyncio.gather(*connects)
 
         return list(self.devices.values())
 

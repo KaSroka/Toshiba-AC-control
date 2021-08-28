@@ -23,6 +23,7 @@ class ToshibaAcDeviceInfo:
     ac_id: str
     ac_unique_id: str
     ac_name: str
+    initial_ac_state: str
 
 class ToshibaAcHttpApiError(Exception):
     pass
@@ -35,7 +36,7 @@ class ToshibaAcHttpApi:
     LOGIN_PATH = '/api/Consumer/Login'
     REGISTER_PATH = '/api/Consumer/RegisterMobileDevice'
     AC_MAPPING_PATH = '/api/AC/GetConsumerACMapping'
-    STATUS_PATH = '/api/AC/GetCurrentACState'
+    AC_STATE_PATH = '/api/AC/GetCurrentACState'
 
     def __init__(self, username, password):
         self.username = username
@@ -105,16 +106,16 @@ class ToshibaAcHttpApi:
 
         for group in res:
             for device in group['ACList']:
-                devices.append(ToshibaAcDeviceInfo(device['Id'], device['DeviceUniqueId'], device['Name']))
+                devices.append(ToshibaAcDeviceInfo(device['Id'], device['DeviceUniqueId'], device['Name'], device['ACStateData']))
 
         return devices
 
-    async def get_device_state(self, ac_unique_id):
+    async def get_device_state(self, ac_id):
         get = {
-            "ACId": ac_unique_id,
+            "ACId": ac_id,
         }
 
-        res = await self.request_api(self.STATUS_PATH, get=get)
+        res = await self.request_api(self.AC_STATE_PATH, get=get)
 
         return res['ACStateData']
 

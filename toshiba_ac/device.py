@@ -23,10 +23,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ToshibaAcDevice:
-    HOST_NAME = 'toshibasmaciothubprod.azure-devices.net'
     PERIODIC_STATE_RELOAD_PERIOD = 60 * 10
 
-    def __init__(self, name, device_id, ac_id, ac_unique_id, amqp_api, http_api):
+    def __init__(self, name, device_id, ac_id, ac_unique_id, initial_ac_state, amqp_api, http_api):
         self.name = name
         self.device_id = device_id
         self.ac_id = ac_id
@@ -36,8 +35,10 @@ class ToshibaAcDevice:
         self.fcu_state = ToshibaAcFcuState()
         self.on_state_changed = None
 
+        if self.fcu_state.update(initial_ac_state):
+            self.state_changed()
+
     async def connect(self):
-        await self.state_reload()
         self.periodic_reload_state_task = asyncio.get_event_loop().create_task(self.periodic_state_reload())
 
     async def shutdown(self):
