@@ -126,7 +126,7 @@ class ToshibaAcHttpApi:
 
     async def get_devices_energy_consumption(self, ac_unique_ids):
         year = int(datetime.datetime.now().year)
-        iso_since = datetime.datetime(year, 1, 1).astimezone(datetime.timezone.utc).isoformat()
+        since = datetime.datetime(year, 1, 1).astimezone(datetime.timezone.utc)
 
         post = {
             'ACDeviceUniqueIdList': ac_unique_ids,
@@ -142,7 +142,7 @@ class ToshibaAcHttpApi:
 
         for ac in res:
             consumption = sum(int(consumption['Energy']) for consumption in ac['EnergyConsumption'])
-            ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(consumption, iso_since)
+            ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(consumption, since)
 
         return ret
 

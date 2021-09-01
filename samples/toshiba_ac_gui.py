@@ -126,7 +126,7 @@ class App(tk.Tk):
         dev_tab.ac_outdoor_temperature.set(f'Outdoor temperature: {dev_tab.device.ac_outdoor_temperature}')
         self.update_ac_state_entry(dev_tab, 'ac_self_cleaning', 'Self cleaning')
         if dev_tab.device.ac_energy_consumption:
-            dev_tab.ac_energy_consumption.set(f'Energy used {dev_tab.device.ac_energy_consumption.energy_wh}Wh since {dev_tab.device.ac_energy_consumption.since}')
+            dev_tab.ac_energy_consumption.set(f'Energy used {dev_tab.device.ac_energy_consumption.energy_wh}Wh since {dev_tab.device.ac_energy_consumption.since.isoformat()}')
 
     def dev_state_changed(self, dev):
         self.update_ac_state(self.devices[dev])

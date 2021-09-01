@@ -21,12 +21,14 @@ import asyncio
 
 import logging
 
+import datetime
+
 logger = logging.getLogger(__name__)
 
 @dataclass
 class ToshibaAcDeviceEnergyConsumption:
     energy_wh: float
-    since: str
+    since: datetime.datetime
 
 class ToshibaAcDeviceCallback:
     def __init__(self):
