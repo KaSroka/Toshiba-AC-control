@@ -129,10 +129,10 @@ class App(tk.Tk):
             dev_tab.ac_energy_consumption.set(f'Energy used {dev_tab.device.ac_energy_consumption.energy_wh}Wh since {dev_tab.device.ac_energy_consumption.since}')
 
     def dev_state_changed(self, dev):
-        self.loop.call_soon_threadsafe(self.update_ac_state, self.devices[dev])
+        self.update_ac_state(self.devices[dev])
 
     async def init(self):
-        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, '3e6e4eb5f0e5aa40')
+        self.device_manager = ToshibaAcDeviceManager(self.loop, self.user, self.password, '3e6e4eb5f0e5aa40')
         sas_token = await self.device_manager.connect()
         logger.debug(f'AMQP SAS token: {sas_token}')
 
@@ -144,7 +144,8 @@ class App(tk.Tk):
             self.populate_device_tab(dev_tab)
             self.devices[device] = dev_tab
 
-            device.on_state_changed = self.dev_state_changed
+            device.on_state_changed_callback.add(self.dev_state_changed)
+            device.on_energy_consumption_changed_callback.add(self.dev_state_changed)
 
             self.tab_control.add(tab, text=f'{device.name}')
 

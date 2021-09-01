@@ -28,25 +28,52 @@ class ToshibaAcDeviceEnergyConsumption:
     energy_wh: float
     since: str
 
+class ToshibaAcDeviceCallback:
+    def __init__(self):
+        self.callbacks = []
+
+    def add(self, callback):
+        if callback not in self.callbacks:
+            self.callbacks.append(callback)
+            return True
+
+        return False
+
+    def remove(self, callback):
+        if callback in self.callbacks:
+            self.callbacks.remove(callback)
+            return True
+
+        return False
+
+    async def __call__(self, *args, **kwargs):
+        for callback in self.callbacks:
+            asyncs = []
+            if asyncio.iscoroutinefunction(callback):
+                asyncs.append(callback(*args, **kwargs))
+            else:
+                callback(*args, **kwargs)
+
+            await asyncio.gather(*asyncs)
+
 class ToshibaAcDevice:
     PERIODIC_STATE_RELOAD_PERIOD = 60 * 10
 
-    def __init__(self, name, device_id, ac_id, ac_unique_id, initial_ac_state, amqp_api, http_api):
+    def __init__(self, loop, name, device_id, ac_id, ac_unique_id, initial_ac_state, amqp_api, http_api):
+        self.loop = loop
         self.name = name
         self.device_id = device_id
         self.ac_id = ac_id
         self.ac_unique_id = ac_unique_id
         self.amqp_api = amqp_api
         self.http_api = http_api
-        self.fcu_state = ToshibaAcFcuState()
-        self.on_state_changed = None
+        self.fcu_state = ToshibaAcFcuState.from_hex_state(initial_ac_state)
+        self._on_state_changed_callback = ToshibaAcDeviceCallback()
+        self._on_energy_consumption_changed_callback = ToshibaAcDeviceCallback()
         self._ac_energy_consumption = None
 
-        if self.fcu_state.update(initial_ac_state):
-            self.state_changed()
-
     async def connect(self):
-        self.periodic_reload_state_task = asyncio.get_event_loop().create_task(self.periodic_state_reload())
+        self.periodic_reload_state_task = self.loop.create_task(self.periodic_state_reload())
 
     async def shutdown(self):
         self.periodic_reload_state_task.cancel()
@@ -55,26 +82,33 @@ class ToshibaAcDevice:
         hex_state = await self.http_api.get_device_state(self.ac_id)
         logger.debug(f'[{self.name}] AC state from HTTP: {hex_state}')
         if self.fcu_state.update(hex_state):
-            self.state_changed()
+            await self.state_changed()
 
-    def state_changed(self):
+    async def state_changed(self):
         logger.info(f'[{self.name}] Current state: {self.fcu_state}')
-        if self.on_state_changed:
-            self.on_state_changed(self)
+        await self.on_state_changed_callback(self)
 
     async def periodic_state_reload(self):
         while True:
             await asyncio.sleep(self.PERIODIC_STATE_RELOAD_PERIOD)
             await self.state_reload()
 
-    def handle_cmd_fcu_from_ac(self, payload):
+    async def handle_cmd_fcu_from_ac(self, payload):
         logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')
         if self.fcu_state.update(payload['data']):
-            self.state_changed()
+            await self.state_changed()
 
-    def handle_cmd_heartbeat(self, payload):
+    async def handle_cmd_heartbeat(self, payload):
         hb_data = {k : int(v, base=16) for k, v in payload.items()}
         logger.debug(f'[{self.name}] AC heartbeat from AMQP: {hb_data}')
+
+    async def handle_update_ac_energy_consumption(self, val):
+        if self._ac_energy_consumption != val:
+            self._ac_energy_consumption = val
+
+            logger.debug(f'[{self.name}] Energy consumption: {val}')
+
+            await self.on_energy_consumption_changed_callback(self)
 
     def create_cmd_fcu_to_ac(self, hex_state):
         return {
@@ -247,14 +281,13 @@ class ToshibaAcDevice:
     def ac_energy_consumption(self):
         return self._ac_energy_consumption
 
-    def handle_update_ac_energy_consumption(self, val):
-        if self._ac_energy_consumption != val:
-            self._ac_energy_consumption = val
+    @property
+    def on_state_changed_callback(self):
+        return self._on_state_changed_callback
 
-            logger.debug(f'[{self.name}] Energy consumption: {val}')
-
-            if self.on_state_changed:
-                self.on_state_changed(self)
+    @property
+    def on_energy_consumption_changed_callback(self):
+        return self._on_energy_consumption_changed_callback
 
     def __repr__(self):
         return f'ToshibaAcDevice(name={self.name}, device_id={self.device_id}, ac_id={self.ac_id}, ac_unique_id={self.ac_unique_id})'

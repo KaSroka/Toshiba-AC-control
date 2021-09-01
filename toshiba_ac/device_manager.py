@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 class ToshibaAcDeviceManager:
     PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD = 60 * 10
 
-    def __init__(self, username, password, device_id=None, sas_token=None):
+    def __init__(self, loop, username, password, device_id=None, sas_token=None):
+        self.loop = loop
         self.username = username
         self.password = password
         self.http_api = None
@@ -76,8 +77,13 @@ class ToshibaAcDeviceManager:
 
             logger.debug(f'Power consumption for devices: {consumptions}')
 
+            updates = []
+
             for ac_unique_id, consumption in consumptions.items():
-                self.devices[ac_unique_id].handle_update_ac_energy_consumption(consumption)
+                update = self.devices[ac_unique_id].handle_update_ac_energy_consumption(consumption)
+                updates.append(update)
+
+            await asyncio.gather(*updates)
 
             await asyncio.sleep(self.PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD)
 
@@ -91,6 +97,7 @@ class ToshibaAcDeviceManager:
 
             for device_info in devices_info:
                 device = ToshibaAcDevice(
+                    self.loop,
                     device_info.ac_name,
                     self.device_id,
                     device_info.ac_id,
@@ -109,12 +116,12 @@ class ToshibaAcDeviceManager:
             await asyncio.gather(*connects)
 
             if not self.periodic_fetch_energy_consumption_task:
-                self.periodic_fetch_energy_consumption_task = asyncio.get_event_loop().create_task(self.periodic_fetch_energy_consumption())
+                self.periodic_fetch_energy_consumption_task = self.loop.create_task(self.periodic_fetch_energy_consumption())
 
         return list(self.devices.values())
 
     def handle_cmd_fcu_from_ac(self, source_id, message_id, target_id, payload, timestamp):
-        self.devices[source_id].handle_cmd_fcu_from_ac(payload)
+        asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_fcu_from_ac(payload), self.loop).result()
 
     def handle_cmd_heartbeat(self, source_id, message_id, target_id, payload, timestamp):
-        self.devices[source_id].handle_cmd_heartbeat(payload)
+        asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_heartbeat(payload), self.loop).result()
