@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from toshiba_ac.amqp_api import ToshibaAcAmqpApi
 from toshiba_ac.fcu_state import ToshibaAcFcuState
+from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
 
 from azure.iot.device import Message
 from dataclasses import dataclass
@@ -59,7 +59,7 @@ class ToshibaAcDeviceCallback:
             await asyncio.gather(*asyncs)
 
 class ToshibaAcDevice:
-    PERIODIC_STATE_RELOAD_PERIOD = 60 * 10
+    STATE_RELOAD_PERIOD_MINUTES = 30
 
     def __init__(self, loop, name, device_id, ac_id, ac_unique_id, initial_ac_state, amqp_api, http_api):
         self.loop = loop
@@ -92,8 +92,8 @@ class ToshibaAcDevice:
 
     async def periodic_state_reload(self):
         while True:
-            await asyncio.sleep(self.PERIODIC_STATE_RELOAD_PERIOD)
             await self.state_reload()
+            await async_sleep_until_next_multiply_of_minutes(self.STATE_RELOAD_PERIOD_MINUTES)
 
     async def handle_cmd_fcu_from_ac(self, payload):
         logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')

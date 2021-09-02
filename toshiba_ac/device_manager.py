@@ -15,6 +15,7 @@
 from toshiba_ac.http_api import ToshibaAcHttpApi
 from toshiba_ac.amqp_api import ToshibaAcAmqpApi
 from toshiba_ac.device import ToshibaAcDevice
+from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
 
 import asyncio
 
@@ -22,7 +23,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ToshibaAcDeviceManager:
-    PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD = 60 * 10
+    FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES = 10
 
     def __init__(self, loop, username, password, device_id=None, sas_token=None):
         self.loop = loop
@@ -88,7 +89,7 @@ class ToshibaAcDeviceManager:
 
             await asyncio.gather(*updates)
 
-            await asyncio.sleep(self.PERIODIC_FETCH_ENERGY_CONSUMPTION_PERIOD)
+            await async_sleep_until_next_multiply_of_minutes(self.FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES)
 
     async def get_devices(self):
         async with self.lock:
