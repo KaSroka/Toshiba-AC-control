@@ -77,19 +77,22 @@ class ToshibaAcDeviceManager:
 
     async def periodic_fetch_energy_consumption(self):
         while True:
-            consumptions = await self.http_api.get_devices_energy_consumption([ac_unique_id for ac_unique_id in self.devices.keys()])
-
-            logger.debug(f'Power consumption for devices: {consumptions}')
-
-            updates = []
-
-            for ac_unique_id, consumption in consumptions.items():
-                update = self.devices[ac_unique_id].handle_update_ac_energy_consumption(consumption)
-                updates.append(update)
-
-            await asyncio.gather(*updates)
-
             await async_sleep_until_next_multiply_of_minutes(self.FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES)
+            await self.fetch_energy_consumption()
+
+    async def fetch_energy_consumption(self):
+        consumptions = await self.http_api.get_devices_energy_consumption([ac_unique_id for ac_unique_id in self.devices.keys()])
+
+        logger.debug(f'Power consumption for devices: {consumptions}')
+
+        updates = []
+
+        for ac_unique_id, consumption in consumptions.items():
+            update = self.devices[ac_unique_id].handle_update_ac_energy_consumption(consumption)
+            updates.append(update)
+
+        await asyncio.gather(*updates)
+
 
     async def get_devices(self):
         async with self.lock:
@@ -122,6 +125,7 @@ class ToshibaAcDeviceManager:
                     self.devices[device.ac_unique_id] = device
 
                 await asyncio.gather(*connects)
+                await self.fetch_energy_consumption()
 
                 if not self.periodic_fetch_energy_consumption_task:
                     self.periodic_fetch_energy_consumption_task = self.loop.create_task(self.periodic_fetch_energy_consumption())
