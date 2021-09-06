@@ -77,13 +77,13 @@ class ToshibaAcFcuState:
 
     class AcMeritAFeature(Enum):
         HIGH_POWER = 0x01
-        SILENT_1 = 0x02
-        SLEEP = 0x03
-        SAVE = 0x04
+        CDU_SILENT_1 = 0x02
+        ECO = 0x03
+        HEATING_8C = 0x04
         SLEEP_CARE = 0x05
         FLOOR = 0x06
         COMFORT = 0x07
-        SILENT_2 = 0x0a
+        CDU_SILENT_2 = 0x0a
         OFF = 0x00
         NONE = 0x0f
 

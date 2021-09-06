@@ -22,12 +22,22 @@ logger = logging.getLogger(__name__)
 
 from toshiba_ac.device import ToshibaAcDeviceEnergyConsumption
 
+import typing
+
 @dataclass
 class ToshibaAcDeviceInfo:
     ac_id: str
     ac_unique_id: str
     ac_name: str
     initial_ac_state: str
+    firmware_version: str
+    merit_feature: str
+    ac_model_id: str
+
+@dataclass
+class ToshibaAcDeviceAdditionalInfo:
+    cdu: typing.Optional[str]
+    fcu: typing.Optional[str]
 
 class ToshibaAcHttpApiError(Exception):
     pass
@@ -111,7 +121,17 @@ class ToshibaAcHttpApi:
 
         for group in res:
             for device in group['ACList']:
-                devices.append(ToshibaAcDeviceInfo(device['Id'], device['DeviceUniqueId'], device['Name'], device['ACStateData']))
+                devices.append(
+                    ToshibaAcDeviceInfo(
+                        device['Id'],
+                        device['DeviceUniqueId'],
+                        device['Name'],
+                        device['ACStateData'],
+                        device['FirmwareVersion'],
+                        device['MeritFeature'],
+                        device['ACModelId']
+                    )
+                )
 
         return devices
 
@@ -123,6 +143,28 @@ class ToshibaAcHttpApi:
         res = await self.request_api(self.AC_STATE_PATH, get=get)
 
         return res['ACStateData']
+
+    async def get_device_additional_info(self, ac_id):
+        get = {
+            "ACId": ac_id,
+        }
+
+        res = await self.request_api(self.AC_STATE_PATH, get=get)
+
+        try:
+            cdu = res['Cdu']['model_name']
+        except KeyError:
+            cdu = None
+
+        try:
+            fcu = res['Fcu']['model_name']
+        except KeyError:
+            fcu = None
+
+        return ToshibaAcDeviceAdditionalInfo(
+            cdu=cdu,
+            fcu=fcu
+        )
 
     async def get_devices_energy_consumption(self, ac_unique_ids):
         year = int(datetime.datetime.now().year)

@@ -108,6 +108,9 @@ class ToshibaAcDeviceManager:
                         device_info.ac_id,
                         device_info.ac_unique_id,
                         device_info.initial_ac_state,
+                        device_info.firmware_version,
+                        device_info.merit_feature,
+                        device_info.ac_model_id,
                         self.amqp_api,
                         self.http_api
                     )
