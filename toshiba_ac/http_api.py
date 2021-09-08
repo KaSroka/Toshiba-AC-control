@@ -155,12 +155,16 @@ class ToshibaAcHttpApi:
             cdu = res['Cdu']['model_name']
         except KeyError:
             cdu = None
-
+        except TypeError:
+            cdu = None
+            
         try:
             fcu = res['Fcu']['model_name']
         except KeyError:
             fcu = None
-
+        except TypeError:
+            fcu = None
+            
         return ToshibaAcDeviceAdditionalInfo(
             cdu=cdu,
             fcu=fcu
