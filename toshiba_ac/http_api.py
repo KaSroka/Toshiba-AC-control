@@ -186,9 +186,11 @@ class ToshibaAcHttpApi:
 
         ret = {}
 
-        for ac in res:
-            consumption = sum(int(consumption['Energy']) for consumption in ac['EnergyConsumption'])
-            ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(consumption, since)
+        if res:
+            for ac in res:
+                if 'EnergyConsumption' in ac and ac['EnergyConsumption']:
+                    consumption = sum(int(consumption['Energy']) for consumption in ac['EnergyConsumption'])
+                    ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(con
 
         return ret
 
