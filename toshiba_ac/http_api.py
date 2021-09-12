@@ -153,16 +153,12 @@ class ToshibaAcHttpApi:
 
         try:
             cdu = res['Cdu']['model_name']
-        except KeyError:
-            cdu = None
-        except TypeError:
+        except (KeyError, TypeError):
             cdu = None
 
         try:
             fcu = res['Fcu']['model_name']
-        except KeyError:
-            fcu = None
-        except TypeError:
+        except (KeyError, TypeError):
             fcu = None
 
         return ToshibaAcDeviceAdditionalInfo(
@@ -186,11 +182,15 @@ class ToshibaAcHttpApi:
 
         ret = {}
 
-        if res:
+        try:
             for ac in res:
-                if 'EnergyConsumption' in ac and ac['EnergyConsumption']:
+                try:
                     consumption = sum(int(consumption['Energy']) for consumption in ac['EnergyConsumption'])
                     ret[ac['ACDeviceUniqueId']] = ToshibaAcDeviceEnergyConsumption(consumption, since)
+                except (KeyError, ValueError):
+                    pass
+        except TypeError:
+            pass
 
         return ret
 
