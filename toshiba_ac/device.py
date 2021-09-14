@@ -101,7 +101,10 @@ class ToshibaAcDevice:
         await self.on_state_changed_callback(self)
 
     def load_supported_merit_features(self, merit_feature_hexstring, ac_model_id):
-        merit_byte, _ = struct.unpack('bb', bytes.fromhex(merit_feature_hexstring))
+        try:
+            merit_byte, = struct.unpack('b', bytes.fromhex(merit_feature_hexstring[:2]))
+        except (TypeError, ValueError, struct.error):
+            ac_model_id = '1'
 
         supported_a_features = [ToshibaAcFcuState.AcMeritAFeature.OFF]
         supported_b_features = [ToshibaAcFcuState.AcMeritBFeature.OFF]
