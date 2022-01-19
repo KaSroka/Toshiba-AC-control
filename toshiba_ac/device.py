@@ -102,7 +102,7 @@ class ToshibaAcDevice:
 
     def load_supported_merit_features(self, merit_feature_hexstring, ac_model_id):
         try:
-            merit_byte, = struct.unpack('b', bytes.fromhex(merit_feature_hexstring[:2]))
+            merit_byte, = struct.unpack('B', bytes.fromhex(merit_feature_hexstring[:2]))
         except (TypeError, ValueError, struct.error):
             ac_model_id = '1'
 
