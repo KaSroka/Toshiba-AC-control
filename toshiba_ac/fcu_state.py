@@ -139,13 +139,13 @@ class ToshibaAcFcuState:
                 ToshibaAcFcuState.AcNone.NONE,
                 ToshibaAcFcuState.AcNone.NONE,
                 ToshibaAcFcuState.AcNone.NONE)
-        encoded = struct.pack('bbbbbbbbbbbbbbbbbbbb', *[prop.value for prop in data]).hex()
+        encoded = struct.pack('BBBBBBBBBBBBBBBBBBBB', *[prop.value for prop in data]).hex()
         return encoded[:12] + encoded[13] + encoded[15] + encoded[16:] # Merit A/B features are encoded using half bytes but our packing added them as bytes
 
 
     def decode(self, hex_state):
         extended_hex_state = hex_state[:12] + '0' + hex_state[12] + '0' + hex_state[13:] # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
-        data = struct.unpack('bbbbbbbbbbbbbbbbbbbb', bytes.fromhex(extended_hex_state))
+        data = struct.unpack('BBBBBBBBBBBBBBBBBBBB', bytes.fromhex(extended_hex_state))
         (self.ac_status,
         self.ac_mode,
         self.ac_temperature,
