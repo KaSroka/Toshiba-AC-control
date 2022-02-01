@@ -90,7 +90,7 @@ class ToshibaAcDeviceManager:
         logger.debug(
             "Power consumption for devices: {"
             + " ,".join(
-                f"{self.devices[ac_unique_id]}: {consumption.energy_wh}Wh"
+                f"{self.devices[ac_unique_id].name}: {consumption.energy_wh}Wh"
                 for ac_unique_id, consumption in consumptions.items()
             )
             + "}"
@@ -144,12 +144,14 @@ class ToshibaAcDeviceManager:
                     self.devices[device.ac_unique_id] = device
 
                 await asyncio.gather(*connects)
-                await self.fetch_energy_consumption()
 
-                if not self.periodic_fetch_energy_consumption_task:
-                    self.periodic_fetch_energy_consumption_task = self.loop.create_task(
-                        self.periodic_fetch_energy_consumption()
-                    )
+                if any(device.supported.ac_energy_report for device in self.devices.values()):
+                    await self.fetch_energy_consumption()
+
+                    if not self.periodic_fetch_energy_consumption_task:
+                        self.periodic_fetch_energy_consumption_task = self.loop.create_task(
+                            self.periodic_fetch_energy_consumption()
+                        )
 
             return list(self.devices.values())
 

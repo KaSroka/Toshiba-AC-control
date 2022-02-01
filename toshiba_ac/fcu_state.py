@@ -12,93 +12,246 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
+from typing import Optional
 import struct
 
-_NONE_VAL = -1
+from toshiba_ac.device_properties import (
+    ToshibaAcAirPureIon,
+    ToshibaAcFanMode,
+    ToshibaAcMeritA,
+    ToshibaAcMeritB,
+    ToshibaAcMode,
+    ToshibaAcPowerSelection,
+    ToshibaAcSelfCleaning,
+    ToshibaAcStatus,
+    ToshibaAcSwingMode,
+)
 
 
 class ToshibaAcFcuState:
+    NONE_VAL = 0xFF
+    NONE_VAL_HALF = 0x0F
+    NONE_VAL_SIGNED = -1
+    ENCODING_STRUCT = struct.Struct("BBbBBBBBBbbBBBBBBBBB")
 
-    AcTemperature = Enum(
-        "AcTemperature", tuple((str(i), i) for i in range(-100, 100)) + (("NONE", _NONE_VAL), ("UNKNOWN", 0x7F))
-    )
+    class AcTemperature:
+        @staticmethod
+        def from_raw(raw: int) -> Optional[int]:
+            return {127: None, -128: None, ToshibaAcFcuState.NONE_VAL_SIGNED: None, 126: -1}.get(raw, raw)
 
-    class AcNone(Enum):
-        NONE = _NONE_VAL
+        @staticmethod
+        def to_raw(temperature: Optional[int]) -> int:
+            return {
+                None: ToshibaAcFcuState.NONE_VAL_SIGNED,
+                -1: 126,
+            }.get(temperature, temperature)
 
-    class AcStatus(Enum):
-        ON = 0x30
-        OFF = 0x31
-        INVALID = 0x02
-        NONE = _NONE_VAL
+    class AcStatus:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcStatus:
+            return {
+                0x30: ToshibaAcStatus.ON,
+                0x31: ToshibaAcStatus.OFF,
+                0x02: ToshibaAcStatus.NONE,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcStatus.NONE,
+            }[raw]
 
-    class AcMode(Enum):
-        AUTO = 0x41
-        COOL = 0x42
-        HEAT = 0x43
-        DRY = 0x44
-        FAN = 0x45
-        INVALID = 0x00
-        NONE = _NONE_VAL
+        @staticmethod
+        def to_raw(status: ToshibaAcStatus) -> int:
+            return {
+                ToshibaAcStatus.ON: 0x30,
+                ToshibaAcStatus.OFF: 0x31,
+                ToshibaAcStatus.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[status]
 
-    class AcFanMode(Enum):
-        AUTO = 0x41
-        QUIET = 0x31
-        LOW = 0x32
-        MEDIUM_LOW = 0x33
-        MEDIUM = 0x34
-        MEDIUM_HIGH = 0x35
-        HIGH = 0x36
-        INVALID = 0x00
-        NONE = _NONE_VAL
+    class AcMode:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcMode:
+            return {
+                0x41: ToshibaAcMode.AUTO,
+                0x42: ToshibaAcMode.COOL,
+                0x43: ToshibaAcMode.HEAT,
+                0x44: ToshibaAcMode.DRY,
+                0x45: ToshibaAcMode.FAN,
+                0x00: ToshibaAcMode.NONE,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcMode.NONE,
+            }[raw]
 
-    class AcSwingMode(Enum):
-        NOT_USED = 0x31
-        SWING_VERTICAL = 0x41
-        SWING_HORIZONTAL = 0x42
-        SWING_VERTICAL_AND_HORIZONTAL = 0x43
-        FIXED_1 = 0x50
-        FIXED_2 = 0x51
-        FIXED_3 = 0x52
-        FIXED_4 = 0x53
-        FIXED_5 = 0x54
-        INVALID = 0x00
-        NONE = _NONE_VAL
+        @staticmethod
+        def to_raw(mode: ToshibaAcMode) -> int:
+            return {
+                ToshibaAcMode.AUTO: 0x41,
+                ToshibaAcMode.COOL: 0x42,
+                ToshibaAcMode.HEAT: 0x43,
+                ToshibaAcMode.DRY: 0x44,
+                ToshibaAcMode.FAN: 0x45,
+                ToshibaAcMode.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[mode]
 
-    class AcPowerSelection(Enum):
-        POWER_50 = 0x32
-        POWER_75 = 0x4B
-        POWER_100 = 0x64
-        NONE = _NONE_VAL
+    class AcFanMode:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcFanMode:
+            return {
+                0x41: ToshibaAcFanMode.AUTO,
+                0x31: ToshibaAcFanMode.QUIET,
+                0x32: ToshibaAcFanMode.LOW,
+                0x33: ToshibaAcFanMode.MEDIUM_LOW,
+                0x34: ToshibaAcFanMode.MEDIUM,
+                0x35: ToshibaAcFanMode.MEDIUM_HIGH,
+                0x36: ToshibaAcFanMode.HIGH,
+                0x00: ToshibaAcFanMode.NONE,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcFanMode.NONE,
+            }[raw]
 
-    class AcMeritBFeature(Enum):
-        FIREPLACE_1 = 0x02
-        FIREPLACE_2 = 0x03
-        OFF = 0x00
-        NONE = 0x0F
+        @staticmethod
+        def to_raw(fan_mode: ToshibaAcFanMode) -> int:
+            return {
+                ToshibaAcFanMode.AUTO: 0x41,
+                ToshibaAcFanMode.QUIET: 0x31,
+                ToshibaAcFanMode.LOW: 0x32,
+                ToshibaAcFanMode.MEDIUM_LOW: 0x33,
+                ToshibaAcFanMode.MEDIUM: 0x34,
+                ToshibaAcFanMode.MEDIUM_HIGH: 0x35,
+                ToshibaAcFanMode.HIGH: 0x36,
+                ToshibaAcFanMode.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[fan_mode]
 
-    class AcMeritAFeature(Enum):
-        HIGH_POWER = 0x01
-        CDU_SILENT_1 = 0x02
-        ECO = 0x03
-        HEATING_8C = 0x04
-        SLEEP_CARE = 0x05
-        FLOOR = 0x06
-        COMFORT = 0x07
-        CDU_SILENT_2 = 0x0A
-        OFF = 0x00
-        NONE = 0x0F
+    class AcSwingMode:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcSwingMode:
+            return {
+                0x31: ToshibaAcSwingMode.OFF,
+                0x41: ToshibaAcSwingMode.SWING_VERTICAL,
+                0x42: ToshibaAcSwingMode.SWING_HORIZONTAL,
+                0x43: ToshibaAcSwingMode.SWING_VERTICAL_AND_HORIZONTAL,
+                0x50: ToshibaAcSwingMode.FIXED_1,
+                0x51: ToshibaAcSwingMode.FIXED_2,
+                0x52: ToshibaAcSwingMode.FIXED_3,
+                0x53: ToshibaAcSwingMode.FIXED_4,
+                0x54: ToshibaAcSwingMode.FIXED_5,
+                0x00: ToshibaAcSwingMode.NONE,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcSwingMode.NONE,
+            }[raw]
 
-    class AcAirPureIon(Enum):
-        OFF = 0x10
-        ON = 0x18
-        NONE = _NONE_VAL
+        @staticmethod
+        def to_raw(swing_mode: ToshibaAcSwingMode) -> int:
+            return {
+                ToshibaAcSwingMode.OFF: 0x31,
+                ToshibaAcSwingMode.SWING_VERTICAL: 0x41,
+                ToshibaAcSwingMode.SWING_HORIZONTAL: 0x42,
+                ToshibaAcSwingMode.SWING_VERTICAL_AND_HORIZONTAL: 0x43,
+                ToshibaAcSwingMode.FIXED_1: 0x50,
+                ToshibaAcSwingMode.FIXED_2: 0x51,
+                ToshibaAcSwingMode.FIXED_3: 0x52,
+                ToshibaAcSwingMode.FIXED_4: 0x53,
+                ToshibaAcSwingMode.FIXED_5: 0x54,
+                ToshibaAcSwingMode.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[swing_mode]
 
-    class AcSelfCleaning(Enum):
-        ON = 0x18
-        OFF = 0x10
-        NONE = _NONE_VAL
+    class AcPowerSelection:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcPowerSelection:
+            return {
+                0x32: ToshibaAcPowerSelection.POWER_50,
+                0x4B: ToshibaAcPowerSelection.POWER_75,
+                0x64: ToshibaAcPowerSelection.POWER_100,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcPowerSelection.NONE,
+            }[raw]
+
+        @staticmethod
+        def to_raw(power_selection: ToshibaAcPowerSelection) -> int:
+            return {
+                ToshibaAcPowerSelection.POWER_50: 0x32,
+                ToshibaAcPowerSelection.POWER_75: 0x4B,
+                ToshibaAcPowerSelection.POWER_100: 0x64,
+                ToshibaAcPowerSelection.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[power_selection]
+
+    class AcMeritB:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcMeritB:
+            return {
+                0x02: ToshibaAcMeritB.FIREPLACE_1,
+                0x03: ToshibaAcMeritB.FIREPLACE_2,
+                0x00: ToshibaAcMeritB.OFF,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcMeritB.NONE,
+                ToshibaAcFcuState.NONE_VAL_HALF: ToshibaAcMeritB.NONE,
+            }[raw]
+
+        @staticmethod
+        def to_raw(merit_b: ToshibaAcMeritB) -> int:
+            return {
+                ToshibaAcMeritB.FIREPLACE_1: 0x02,
+                ToshibaAcMeritB.FIREPLACE_2: 0x03,
+                ToshibaAcMeritB.OFF: 0x00,
+                ToshibaAcMeritB.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[merit_b]
+
+    class AcMeritA:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcMeritA:
+            return {
+                0x01: ToshibaAcMeritA.HIGH_POWER,
+                0x02: ToshibaAcMeritA.CDU_SILENT_1,
+                0x03: ToshibaAcMeritA.ECO,
+                0x04: ToshibaAcMeritA.HEATING_8C,
+                0x05: ToshibaAcMeritA.SLEEP_CARE,
+                0x06: ToshibaAcMeritA.FLOOR,
+                0x07: ToshibaAcMeritA.COMFORT,
+                0x0A: ToshibaAcMeritA.CDU_SILENT_2,
+                0x00: ToshibaAcMeritA.OFF,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcMeritA.NONE,
+                ToshibaAcFcuState.NONE_VAL_HALF: ToshibaAcMeritA.NONE,
+            }[raw]
+
+        @staticmethod
+        def to_raw(merit_a: ToshibaAcMeritA) -> int:
+            return {
+                ToshibaAcMeritA.HIGH_POWER: 0x01,
+                ToshibaAcMeritA.CDU_SILENT_1: 0x02,
+                ToshibaAcMeritA.ECO: 0x03,
+                ToshibaAcMeritA.HEATING_8C: 0x04,
+                ToshibaAcMeritA.SLEEP_CARE: 0x05,
+                ToshibaAcMeritA.FLOOR: 0x06,
+                ToshibaAcMeritA.COMFORT: 0x07,
+                ToshibaAcMeritA.CDU_SILENT_2: 0x0A,
+                ToshibaAcMeritA.OFF: 0x00,
+                ToshibaAcMeritA.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[merit_a]
+
+    class AcAirPureIon:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcAirPureIon:
+            return {
+                0x18: ToshibaAcAirPureIon.ON,
+                0x10: ToshibaAcAirPureIon.OFF,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcAirPureIon.NONE,
+            }[raw]
+
+        @staticmethod
+        def to_raw(air_pure_ion: ToshibaAcAirPureIon) -> int:
+            return {
+                ToshibaAcAirPureIon.ON: 0x18,
+                ToshibaAcAirPureIon.OFF: 0x10,
+                ToshibaAcAirPureIon.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[air_pure_ion]
+
+    class AcSelfCleaning:
+        @staticmethod
+        def from_raw(raw: int) -> ToshibaAcSelfCleaning:
+            return {
+                0x18: ToshibaAcSelfCleaning.ON,
+                0x10: ToshibaAcSelfCleaning.OFF,
+                ToshibaAcFcuState.NONE_VAL: ToshibaAcSelfCleaning.NONE,
+            }[raw]
+
+        @staticmethod
+        def to_raw(self_cleaning: ToshibaAcSelfCleaning) -> int:
+            return {
+                ToshibaAcSelfCleaning.ON: 0x18,
+                ToshibaAcSelfCleaning.OFF: 0x10,
+                ToshibaAcSelfCleaning.NONE: ToshibaAcFcuState.NONE_VAL,
+            }[self_cleaning]
 
     @classmethod
     def from_hex_state(cls, hex_state):
@@ -107,239 +260,218 @@ class ToshibaAcFcuState:
         return state
 
     def __init__(self):
-        self.ac_status = ToshibaAcFcuState.AcStatus.NONE
-        self.ac_mode = ToshibaAcFcuState.AcMode.NONE
-        self.ac_temperature = ToshibaAcFcuState.AcTemperature.NONE
-        self.ac_fan_mode = ToshibaAcFcuState.AcFanMode.NONE
-        self.ac_swing_mode = ToshibaAcFcuState.AcSwingMode.NONE
-        self.ac_power_selection = ToshibaAcFcuState.AcPowerSelection.NONE
-        self.ac_merit_b_feature = ToshibaAcFcuState.AcMeritBFeature.NONE
-        self.ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature.NONE
-        self.ac_air_pure_ion = ToshibaAcFcuState.AcAirPureIon.NONE
-        self.ac_indoor_temperature = ToshibaAcFcuState.AcTemperature.NONE
-        self.ac_outdoor_temperature = ToshibaAcFcuState.AcTemperature.NONE
+        self._ac_status = ToshibaAcFcuState.NONE_VAL
+        self._ac_mode = ToshibaAcFcuState.NONE_VAL
+        self._ac_temperature = ToshibaAcFcuState.NONE_VAL_SIGNED
+        self._ac_fan_mode = ToshibaAcFcuState.NONE_VAL
+        self._ac_swing_mode = ToshibaAcFcuState.NONE_VAL
+        self._ac_power_selection = ToshibaAcFcuState.NONE_VAL
+        self._ac_merit_b = ToshibaAcFcuState.NONE_VAL
+        self._ac_merit_a = ToshibaAcFcuState.NONE_VAL
+        self._ac_air_pure_ion = ToshibaAcFcuState.NONE_VAL
+        self._ac_indoor_temperature = ToshibaAcFcuState.NONE_VAL_SIGNED
+        self._ac_outdoor_temperature = ToshibaAcFcuState.NONE_VAL_SIGNED
+        self._ac_self_cleaning = ToshibaAcFcuState.NONE_VAL
 
-        self.ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning.NONE
-
-    def encode(self):
-        data = (
-            self.ac_status,
-            self.ac_mode,
-            self.ac_temperature,
-            self.ac_fan_mode,
-            self.ac_swing_mode,
-            self.ac_power_selection,
-            self.ac_merit_b_feature,
-            self.ac_merit_a_feature,
-            self.ac_air_pure_ion,
-            self.ac_indoor_temperature,
-            self.ac_outdoor_temperature,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-            self.ac_self_cleaning,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-            ToshibaAcFcuState.AcNone.NONE,
-        )
-        encoded = struct.pack("bbbbbbbbbbbbbbbbbbbb", *[prop.value for prop in data]).hex()
+    def encode(self) -> str:
+        encoded = self.ENCODING_STRUCT.pack(
+            self._ac_status,
+            self._ac_mode,
+            self._ac_temperature,
+            self._ac_fan_mode,
+            self._ac_swing_mode,
+            self._ac_power_selection,
+            self._ac_merit_b,
+            self._ac_merit_a,
+            self._ac_air_pure_ion,
+            self._ac_indoor_temperature,
+            self._ac_outdoor_temperature,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+            self._ac_self_cleaning,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+            ToshibaAcFcuState.NONE_VAL,
+        ).hex()
         return (
             encoded[:12] + encoded[13] + encoded[15] + encoded[16:]
         )  # Merit A/B features are encoded using half bytes but our packing added them as bytes
 
-    def decode(self, hex_state):
+    def decode(self, hex_state: str) -> None:
         extended_hex_state = (
             hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:]
         )  # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
-        data = struct.unpack("bbbbbbbbbbbbbbbbbbbb", bytes.fromhex(extended_hex_state))
+        data = self.ENCODING_STRUCT.unpack(bytes.fromhex(extended_hex_state))
         (
-            self.ac_status,
-            self.ac_mode,
-            self.ac_temperature,
-            self.ac_fan_mode,
-            self.ac_swing_mode,
-            self.ac_power_selection,
-            self.ac_merit_b_feature,
-            self.ac_merit_a_feature,
-            self.ac_air_pure_ion,
-            self.ac_indoor_temperature,
-            self.ac_outdoor_temperature,
+            self._ac_status,
+            self._ac_mode,
+            self._ac_temperature,
+            self._ac_fan_mode,
+            self._ac_swing_mode,
+            self._ac_power_selection,
+            self._ac_merit_b,
+            self._ac_merit_a,
+            self._ac_air_pure_ion,
+            self._ac_indoor_temperature,
+            self._ac_outdoor_temperature,
             _,
             _,
             _,
             _,
-            self.ac_self_cleaning,
+            self._ac_self_cleaning,
             *_,
         ) = data
 
-    def update(self, hex_state):
+    def update(self, hex_state: str) -> bool:
         state_update = ToshibaAcFcuState.from_hex_state(hex_state)
 
         changed = False
 
-        if state_update.ac_status not in [ToshibaAcFcuState.AcStatus.NONE, self.ac_status]:
-            self.ac_status = state_update.ac_status
-            changed = True
+        enum_states = [
+            "_ac_status",
+            "_ac_mode",
+            "_ac_fan_mode",
+            "_ac_swing_mode",
+            "_ac_power_selection",
+            "_ac_merit_b",
+            "_ac_merit_a",
+            "_ac_air_pure_ion",
+            "_ac_self_cleaning",
+        ]
 
-        if state_update.ac_mode not in [ToshibaAcFcuState.AcMode.NONE, self.ac_mode]:
-            self.ac_mode = state_update.ac_mode
-            changed = True
+        temperature_states = [
+            "_ac_temperature",
+            "_ac_indoor_temperature",
+            "_ac_outdoor_temperature",
+        ]
 
-        if state_update.ac_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, self.ac_temperature]:
-            self.ac_temperature = state_update.ac_temperature
-            changed = True
+        for enum_state in enum_states:
+            updated_state = getattr(state_update, enum_state)
+            current_state = getattr(self, enum_state)
+            if updated_state not in [ToshibaAcFcuState.NONE_VAL, ToshibaAcFcuState.NONE_VAL_HALF, current_state]:
+                setattr(self, enum_state, updated_state)
+                changed = True
 
-        if state_update.ac_fan_mode not in [ToshibaAcFcuState.AcFanMode.NONE, self.ac_fan_mode]:
-            self.ac_fan_mode = state_update.ac_fan_mode
-            changed = True
-
-        if state_update.ac_swing_mode not in [ToshibaAcFcuState.AcSwingMode.NONE, self.ac_swing_mode]:
-            self.ac_swing_mode = state_update.ac_swing_mode
-            changed = True
-
-        if state_update.ac_power_selection not in [ToshibaAcFcuState.AcPowerSelection.NONE, self.ac_power_selection]:
-            self.ac_power_selection = state_update.ac_power_selection
-            changed = True
-
-        if state_update.ac_merit_b_feature not in [ToshibaAcFcuState.AcMeritBFeature.NONE, self.ac_merit_b_feature]:
-            self.ac_merit_b_feature = state_update.ac_merit_b_feature
-            changed = True
-
-        if state_update.ac_merit_a_feature not in [ToshibaAcFcuState.AcMeritAFeature.NONE, self.ac_merit_a_feature]:
-            self.ac_merit_a_feature = state_update.ac_merit_a_feature
-            changed = True
-
-        if state_update.ac_air_pure_ion not in [ToshibaAcFcuState.AcAirPureIon.NONE, self.ac_air_pure_ion]:
-            self.ac_air_pure_ion = state_update.ac_air_pure_ion
-            changed = True
-
-        if state_update.ac_indoor_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, self.ac_indoor_temperature]:
-            self.ac_indoor_temperature = state_update.ac_indoor_temperature
-            changed = True
-
-        if state_update.ac_outdoor_temperature not in [
-            ToshibaAcFcuState.AcTemperature.NONE,
-            self.ac_outdoor_temperature,
-        ]:
-            self.ac_outdoor_temperature = state_update.ac_outdoor_temperature
-            changed = True
-
-        if state_update.ac_self_cleaning not in [ToshibaAcFcuState.AcSelfCleaning.NONE, self.ac_self_cleaning]:
-            self.ac_self_cleaning = state_update.ac_self_cleaning
-            changed = True
+        for temperature_state in temperature_states:
+            updated_state = getattr(state_update, temperature_state)
+            current_state = getattr(self, temperature_state)
+            if updated_state not in [ToshibaAcFcuState.NONE_VAL_SIGNED, current_state]:
+                setattr(self, temperature_state, updated_state)
+                changed = True
 
         return changed
 
     @property
-    def ac_status(self):
-        return self._ac_status
+    def ac_status(self) -> ToshibaAcStatus:
+        return ToshibaAcFcuState.AcStatus.from_raw(self._ac_status)
 
     @ac_status.setter
-    def ac_status(self, val):
-        self._ac_status = ToshibaAcFcuState.AcStatus(val)
+    def ac_status(self, val: ToshibaAcStatus) -> None:
+        self._ac_status = ToshibaAcFcuState.AcStatus.to_raw(val)
 
     @property
-    def ac_mode(self):
-        return self._ac_mode
+    def ac_mode(self) -> ToshibaAcMode:
+        return ToshibaAcFcuState.AcMode.from_raw(self._ac_mode)
 
     @ac_mode.setter
-    def ac_mode(self, val):
-        self._ac_mode = ToshibaAcFcuState.AcMode(val)
+    def ac_mode(self, val: ToshibaAcMode) -> None:
+        self._ac_mode = ToshibaAcFcuState.AcMode.to_raw(val)
 
     @property
-    def ac_temperature(self):
-        return self._ac_temperature
+    def ac_temperature(self) -> Optional[int]:
+        return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_temperature)
 
     @ac_temperature.setter
-    def ac_temperature(self, val):
-        self._ac_temperature = ToshibaAcFcuState.AcTemperature(val)
+    def ac_temperature(self, val: Optional[int]) -> None:
+        self._ac_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
-    def ac_fan_mode(self):
-        return self._ac_fan_mode
+    def ac_fan_mode(self) -> ToshibaAcFanMode:
+        return ToshibaAcFcuState.AcFanMode.from_raw(self._ac_fan_mode)
 
     @ac_fan_mode.setter
-    def ac_fan_mode(self, val):
-        self._ac_fan_mode = ToshibaAcFcuState.AcFanMode(val)
+    def ac_fan_mode(self, val: ToshibaAcFanMode) -> None:
+        self._ac_fan_mode = ToshibaAcFcuState.AcFanMode.to_raw(val)
 
     @property
-    def ac_swing_mode(self):
-        return self._ac_swing_mode
+    def ac_swing_mode(self) -> ToshibaAcSwingMode:
+        return ToshibaAcFcuState.AcSwingMode.from_raw(self._ac_swing_mode)
 
     @ac_swing_mode.setter
-    def ac_swing_mode(self, val):
-        self._ac_swing_mode = ToshibaAcFcuState.AcSwingMode(val)
+    def ac_swing_mode(self, val: ToshibaAcSwingMode) -> None:
+        self._ac_swing_mode = ToshibaAcFcuState.AcSwingMode.to_raw(val)
 
     @property
-    def ac_power_selection(self):
-        return self._ac_power_selection
+    def ac_power_selection(self) -> ToshibaAcPowerSelection:
+        return ToshibaAcFcuState.AcPowerSelection.from_raw(self._ac_power_selection)
 
     @ac_power_selection.setter
-    def ac_power_selection(self, val):
-        self._ac_power_selection = ToshibaAcFcuState.AcPowerSelection(val)
+    def ac_power_selection(self, val: ToshibaAcPowerSelection) -> None:
+        self._ac_power_selection = ToshibaAcFcuState.AcPowerSelection.to_raw(val)
 
     @property
-    def ac_merit_b_feature(self):
-        return self._ac_merit_b_feature
+    def ac_merit_b(self) -> ToshibaAcMeritB:
+        return ToshibaAcFcuState.AcMeritB.from_raw(self._ac_merit_b)
 
-    @ac_merit_b_feature.setter
-    def ac_merit_b_feature(self, val):
-        self._ac_merit_b_feature = ToshibaAcFcuState.AcMeritBFeature(val)
-
-    @property
-    def ac_merit_a_feature(self):
-        return self._ac_merit_a_feature
-
-    @ac_merit_a_feature.setter
-    def ac_merit_a_feature(self, val):
-        self._ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature(val)
+    @ac_merit_b.setter
+    def ac_merit_b(self, val: ToshibaAcMeritB) -> None:
+        self._ac_merit_b = ToshibaAcFcuState.AcMeritB.to_raw(val)
 
     @property
-    def ac_air_pure_ion(self):
-        return self._ac_air_pure_ion
+    def ac_merit_a(self) -> ToshibaAcMeritA:
+        return ToshibaAcFcuState.AcMeritA.from_raw(self._ac_merit_a)
+
+    @ac_merit_a.setter
+    def ac_merit_a(self, val: ToshibaAcMeritA) -> None:
+        self._ac_merit_a = ToshibaAcFcuState.AcMeritA.to_raw(val)
+
+    @property
+    def ac_air_pure_ion(self) -> ToshibaAcAirPureIon:
+        return ToshibaAcFcuState.AcAirPureIon.from_raw(self._ac_air_pure_ion)
 
     @ac_air_pure_ion.setter
-    def ac_air_pure_ion(self, val):
-        self._ac_air_pure_ion = ToshibaAcFcuState.AcAirPureIon(val)
+    def ac_air_pure_ion(self, val: ToshibaAcAirPureIon) -> None:
+        self._ac_air_pure_ion = ToshibaAcFcuState.AcAirPureIon.to_raw(val)
 
     @property
-    def ac_indoor_temperature(self):
-        return self._ac_indoor_temperature
+    def ac_indoor_temperature(self) -> Optional[int]:
+        return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_indoor_temperature)
 
     @ac_indoor_temperature.setter
-    def ac_indoor_temperature(self, val):
-        self._ac_indoor_temperature = ToshibaAcFcuState.AcTemperature(val)
+    def ac_indoor_temperature(self, val: Optional[int]) -> None:
+        self._ac_indoor_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
-    def ac_outdoor_temperature(self):
-        return self._ac_outdoor_temperature
+    def ac_outdoor_temperature(self) -> Optional[int]:
+        return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_outdoor_temperature)
 
     @ac_outdoor_temperature.setter
-    def ac_outdoor_temperature(self, val):
-        self._ac_outdoor_temperature = ToshibaAcFcuState.AcTemperature(val)
+    def ac_outdoor_temperature(self, val: Optional[int]) -> None:
+        self._ac_outdoor_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
-    def ac_self_cleaning(self):
-        return self._ac_self_cleaning
+    def ac_self_cleaning(self) -> ToshibaAcSelfCleaning:
+        return ToshibaAcFcuState.AcSelfCleaning.from_raw(self._ac_self_cleaning)
 
     @ac_self_cleaning.setter
-    def ac_self_cleaning(self, val):
-        self._ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning(val)
+    def ac_self_cleaning(self, val: ToshibaAcSelfCleaning) -> None:
+        self._ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning.to_raw(val)
 
-    def __str__(self):
+    def __str__(self) -> str:
         res = f"AcStatus: {self.ac_status.name}"
         res += f", AcMode: {self.ac_mode.name}"
-        res += f", AcTemperature: {self.ac_temperature.name}"
+        res += f", AcTemperature: {self.ac_temperature}"
         res += f", AcFanMode: {self.ac_fan_mode.name}"
         res += f", AcSwingMode: {self.ac_swing_mode.name}"
         res += f", AcPowerSelection: {self.ac_power_selection.name}"
-        res += f", AcMeritBFeature: {self.ac_merit_b_feature.name}"
-        res += f", AcMeritAFeature: {self.ac_merit_a_feature.name}"
+        res += f", AcFeatureMeritB: {self.ac_merit_b.name}"
+        res += f", AcFeatureMeritA: {self.ac_merit_a.name}"
         res += f", AcAirPureIon: {self.ac_air_pure_ion.name}"
-        res += f", AcIndoorAcTemperature: {self.ac_indoor_temperature.name}"
-        res += f", AcOutdoorAcTemperature: {self.ac_outdoor_temperature.name}"
+        res += f", AcIndoorAcTemperature: {self.ac_indoor_temperature}"
+        res += f", AcOutdoorAcTemperature: {self.ac_outdoor_temperature}"
         res += f", AcSelfCleaning: {self.ac_self_cleaning.name}"
 
         return res
