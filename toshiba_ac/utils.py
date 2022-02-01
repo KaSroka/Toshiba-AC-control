@@ -29,3 +29,7 @@ async def async_sleep_until_next_multiply_of_minutes(minutes):
     )
 
     await asyncio.sleep((next_rounded - datetime.datetime.now()).total_seconds())
+
+
+def pretty_enum_name(enum):
+    return enum.name.title().replace("_", " ")

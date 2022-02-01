@@ -18,11 +18,21 @@ from tkinter import ttk
 
 import argparse
 import os
-from toshiba_ac.fcu_state import ToshibaAcFcuState
 
 from toshiba_ac.device_manager import ToshibaAcDeviceManager
 
 import logging
+
+from toshiba_ac.device_properties import (
+    ToshibaAcAirPureIon,
+    ToshibaAcFanMode,
+    ToshibaAcMeritA,
+    ToshibaAcMeritB,
+    ToshibaAcMode,
+    ToshibaAcPowerSelection,
+    ToshibaAcStatus,
+    ToshibaAcSwingMode,
+)
 
 toshiba_logger = logging.getLogger("toshiba_ac")
 logging.basicConfig(level=logging.WARNING, format="[%(asctime)s] %(levelname)-8s %(name)s: %(message)s")
@@ -58,7 +68,7 @@ class App(tk.Tk):
         label = ttk.Label(dev_tab.tab, textvariable=string_var)
         label.grid(column=0, row=row, padx=5, pady=0)
 
-        options = [e.name for e in enum if e.name not in ["NONE", "INVALID"]]
+        options = [e.name for e in enum if e.name != "NONE"]
         for i, option in enumerate(options, start=1):
             btn = ttk.Button(
                 dev_tab.tab,
@@ -68,8 +78,8 @@ class App(tk.Tk):
             btn.grid(column=i, row=row, padx=0, pady=0)
 
     def populate_device_tab(self, dev_tab):
-        self.populate_device_tab_enum(dev_tab, "ac_status", ToshibaAcFcuState.AcStatus, dev_tab.device.set_ac_status, 0)
-        self.populate_device_tab_enum(dev_tab, "ac_mode", ToshibaAcFcuState.AcMode, dev_tab.device.set_ac_mode, 1)
+        self.populate_device_tab_enum(dev_tab, "ac_status", ToshibaAcStatus, dev_tab.device.set_ac_status, 0)
+        self.populate_device_tab_enum(dev_tab, "ac_mode", ToshibaAcMode, dev_tab.device.set_ac_mode, 1)
 
         dev_tab.ac_temperature = tk.StringVar()
 
@@ -82,23 +92,15 @@ class App(tk.Tk):
         temp_req.set(dev_tab.device.ac_temperature)
         temp_req.trace_add("write", lambda *_: self.loop.create_task(dev_tab.device.set_ac_temperature(temp_req.get())))
 
+        self.populate_device_tab_enum(dev_tab, "ac_fan_mode", ToshibaAcFanMode, dev_tab.device.set_ac_fan_mode, 3)
+        self.populate_device_tab_enum(dev_tab, "ac_swing_mode", ToshibaAcSwingMode, dev_tab.device.set_ac_swing_mode, 4)
         self.populate_device_tab_enum(
-            dev_tab, "ac_fan_mode", ToshibaAcFcuState.AcFanMode, dev_tab.device.set_ac_fan_mode, 3
+            dev_tab, "ac_power_selection", ToshibaAcPowerSelection, dev_tab.device.set_ac_power_selection, 5
         )
+        self.populate_device_tab_enum(dev_tab, "ac_merit_b", ToshibaAcMeritB, dev_tab.device.set_ac_merit_b, 6)
+        self.populate_device_tab_enum(dev_tab, "ac_merit_a", ToshibaAcMeritA, dev_tab.device.set_ac_merit_a, 7)
         self.populate_device_tab_enum(
-            dev_tab, "ac_swing_mode", ToshibaAcFcuState.AcSwingMode, dev_tab.device.set_ac_swing_mode, 4
-        )
-        self.populate_device_tab_enum(
-            dev_tab, "ac_power_selection", ToshibaAcFcuState.AcPowerSelection, dev_tab.device.set_ac_power_selection, 5
-        )
-        self.populate_device_tab_enum(
-            dev_tab, "ac_merit_b_feature", ToshibaAcFcuState.AcMeritBFeature, dev_tab.device.set_ac_merit_b_feature, 6
-        )
-        self.populate_device_tab_enum(
-            dev_tab, "ac_merit_a_feature", ToshibaAcFcuState.AcMeritAFeature, dev_tab.device.set_ac_merit_a_feature, 7
-        )
-        self.populate_device_tab_enum(
-            dev_tab, "ac_air_pure_ion", ToshibaAcFcuState.AcAirPureIon, dev_tab.device.set_ac_air_pure_ion, 8
+            dev_tab, "ac_air_pure_ion", ToshibaAcAirPureIon, dev_tab.device.set_ac_air_pure_ion, 8
         )
 
         dev_tab.ac_indoor_temperature = tk.StringVar()
@@ -135,8 +137,8 @@ class App(tk.Tk):
         self.update_ac_state_entry(dev_tab, "ac_fan_mode", "Fan mode")
         self.update_ac_state_entry(dev_tab, "ac_swing_mode", "Swing mode")
         self.update_ac_state_entry(dev_tab, "ac_power_selection", "Power selection")
-        self.update_ac_state_entry(dev_tab, "ac_merit_b_feature", "Merit B feature")
-        self.update_ac_state_entry(dev_tab, "ac_merit_a_feature", "Merit A feature")
+        self.update_ac_state_entry(dev_tab, "ac_merit_b", "Merit B feature")
+        self.update_ac_state_entry(dev_tab, "ac_merit_a", "Merit A feature")
         self.update_ac_state_entry(dev_tab, "ac_air_pure_ion", "Pure ion")
         dev_tab.ac_indoor_temperature.set(f"Indoor temperature: {dev_tab.device.ac_indoor_temperature}")
         dev_tab.ac_outdoor_temperature.set(f"Outdoor temperature: {dev_tab.device.ac_outdoor_temperature}")

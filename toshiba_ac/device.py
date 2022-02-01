@@ -12,15 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+from toshiba_ac.device_properties import (
+    ToshibaAcAirPureIon,
+    ToshibaAcFanMode,
+    ToshibaAcMeritA,
+    ToshibaAcMeritB,
+    ToshibaAcMode,
+    ToshibaAcPowerSelection,
+    ToshibaAcSelfCleaning,
+    ToshibaAcStatus,
+    ToshibaAcSwingMode,
+)
 from toshiba_ac.fcu_state import ToshibaAcFcuState
-from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
+from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name
+from toshiba_ac.device_features import ToshibaAcFeatures
 
 from azure.iot.device import Message
 from dataclasses import dataclass
 import asyncio
 
 import datetime
-import struct
 import logging
 
 logger = logging.getLogger(__name__)
@@ -95,14 +107,12 @@ class ToshibaAcDevice:
 
         self.cdu = None
         self.fcu = None
-        self._supported_merit_a_features = None
-        self._supported_merit_b_features = None
-        self._is_pure_ion_supported = None
+        self._supported = ToshibaAcFeatures.from_merit_string_and_model(merit_feature, ac_model_id)
         self._on_state_changed_callback = ToshibaAcDeviceCallback()
         self._on_energy_consumption_changed_callback = ToshibaAcDeviceCallback()
         self._ac_energy_consumption = None
 
-        self.load_supported_merit_features(merit_feature, ac_model_id)
+        logger.debug(f"[{self.name}] {self.supported}")
 
     async def connect(self):
         await self.load_additional_device_info()
@@ -116,51 +126,6 @@ class ToshibaAcDevice:
         self.cdu = additional_info.cdu
         self.fcu = additional_info.fcu
         await self.on_state_changed_callback(self)
-
-    def load_supported_merit_features(self, merit_feature_hexstring, ac_model_id):
-        try:
-            (merit_byte,) = struct.unpack("B", bytes.fromhex(merit_feature_hexstring[:2]))
-        except (TypeError, ValueError, struct.error):
-            ac_model_id = "1"
-
-        supported_a_features = [ToshibaAcFcuState.AcMeritAFeature.OFF]
-        supported_b_features = [ToshibaAcFcuState.AcMeritBFeature.OFF]
-        pure_ion = False
-
-        if ac_model_id != "1":
-            supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.HIGH_POWER)
-            supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.ECO)
-
-            floor, _, cdu_silent, pure_ion, fireplace, heating_8c, _, _ = struct.unpack(
-                "????????", bytes.fromhex("0" + "0".join(f"{merit_byte:08b}"))
-            )
-
-            if floor:
-                supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.FLOOR)
-
-            if cdu_silent:
-                supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.CDU_SILENT_1)
-                supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.CDU_SILENT_2)
-
-            if fireplace:
-                supported_b_features.append(ToshibaAcFcuState.AcMeritBFeature.FIREPLACE_1)
-                supported_b_features.append(ToshibaAcFcuState.AcMeritBFeature.FIREPLACE_2)
-
-            if heating_8c:
-                supported_a_features.append(ToshibaAcFcuState.AcMeritAFeature.HEATING_8C)
-
-        self._supported_merit_a_features = supported_a_features
-        self._supported_merit_b_features = supported_b_features
-        self._is_pure_ion_supported = pure_ion
-
-        logger.debug(
-            "[{}] Supported merit A features: {}. Supported merit B features: {}. Pure ION supported: {}".format(
-                self.name,
-                ", ".join(f.name.title().replace("_", " ") for f in supported_a_features),
-                ", ".join(f.name.title().replace("_", " ") for f in supported_b_features),
-                pure_ion,
-            )
-        )
 
     async def state_reload(self):
         hex_state = await self.http_api.get_device_state(self.ac_id)
@@ -212,31 +177,89 @@ class ToshibaAcDevice:
 
         await self.amqp_api.send_message(msg)
 
-    async def send_state_to_ac(self, state):
+    async def send_state_to_ac(self, state: ToshibaAcFcuState):
         future_state = ToshibaAcFcuState.from_hex_state(self.fcu_state.encode())
         future_state.update(state.encode())
 
-        # In SAVE mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
-        if state.ac_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
-            if future_state.ac_mode == ToshibaAcFcuState.AcMode.HEAT:
-                if future_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.HEATING_8C:
-                    state.ac_temperature = ToshibaAcFcuState.AcTemperature(state.ac_temperature.value + 16)
+        if future_state.ac_status not in self.supported.ac_status:
+            raise ToshibaAcDeviceError(
+                f"[{self.name}] Trying to set unsupported ac status: {pretty_enum_name(future_state.ac_status)}"
+            )
 
-        if future_state.ac_mode != ToshibaAcFcuState.AcMode.HEAT:
-            state.ac_merit_b_feature = ToshibaAcFcuState.AcMeritBFeature.OFF
+        if future_state.ac_mode not in self.supported.ac_mode:
+            raise ToshibaAcDeviceError(
+                f"[{self.name}] Trying to set unsupported ac mode: {pretty_enum_name(future_state.ac_mode)}"
+            )
 
-            if future_state.ac_merit_a_feature in [
-                ToshibaAcFcuState.AcMeritAFeature.HEATING_8C,
-                ToshibaAcFcuState.AcMeritAFeature.FLOOR,
-            ]:
-                state.ac_merit_a_feature = ToshibaAcFcuState.AcMeritAFeature.OFF
+        supported_for_mode = self.supported.for_ac_mode(future_state.ac_mode)
+
+        logger.error(str(supported_for_mode.ac_merit_b))
+        logger.error(str(future_state.ac_merit_b))
+        logger.error(str(self.ac_merit_b))
+        logger.error(str(future_state))
+
+        def warn_if_same_mode(msg):
+            if future_state.ac_mode == self.ac_mode:
+                logger.warning(msg)
+
+        if future_state.ac_fan_mode not in supported_for_mode.ac_fan_mode:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac fan mode: {pretty_enum_name(future_state.ac_fan_mode)}"
+            )
+
+            state.ac_fan_mode = ToshibaAcFanMode.NONE
+
+        if future_state.ac_swing_mode not in supported_for_mode.ac_swing_mode:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac swing mode: {pretty_enum_name(future_state.ac_swing_mode)}"
+            )
+
+            state.ac_swing_mode = ToshibaAcSwingMode.NONE
+
+        if future_state.ac_power_selection not in supported_for_mode.ac_power_selection:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac power selection: {pretty_enum_name(future_state.ac_power_selection)}"
+            )
+
+            state.ac_power_selection = ToshibaAcPowerSelection.NONE
+
+        if future_state.ac_merit_b not in supported_for_mode.ac_merit_b:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac merit b: {pretty_enum_name(future_state.ac_merit_b)}"
+            )
+
+            state.ac_merit_b = ToshibaAcMeritB.OFF
+
+        if future_state.ac_merit_a not in supported_for_mode.ac_merit_a:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac merit a: {pretty_enum_name(future_state.ac_merit_a)}"
+            )
+
+            state.ac_merit_a = ToshibaAcMeritA.OFF
+
+        if future_state.ac_air_pure_ion not in supported_for_mode.ac_air_pure_ion:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac merit a: {pretty_enum_name(future_state.ac_air_pure_ion)}"
+            )
+
+            state.ac_air_pure_ion = ToshibaAcAirPureIon.NONE
+
+        if future_state.ac_self_cleaning not in supported_for_mode.ac_self_cleaning:
+            warn_if_same_mode(
+                f"[{self.name}] Trying to set unsupported ac self cleaning: {pretty_enum_name(future_state.ac_self_cleaning)}"
+            )
+
+            state.ac_self_cleaning = ToshibaAcSelfCleaning.NONE
 
         # If we are requesting to turn on, we have to clear self cleaning flag
-        if (
-            state.ac_status == ToshibaAcFcuState.AcStatus.ON
-            and self.fcu_state.ac_self_cleaning == ToshibaAcFcuState.AcSelfCleaning.ON
-        ):
-            state.ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning.OFF
+        if state.ac_status == ToshibaAcStatus.ON and self.ac_self_cleaning == ToshibaAcSelfCleaning.ON:
+            state.ac_self_cleaning = ToshibaAcSelfCleaning.OFF
+
+        # In HEATING_8C mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
+        if state.ac_temperature is not None:
+            if future_state.ac_mode == ToshibaAcMode.HEAT:
+                if future_state.ac_merit_a == ToshibaAcMeritA.HEATING_8C:
+                    state.ac_temperature = state.ac_temperature + 16
 
         logger.debug(f"[{self.name}] Sending command: {state}")
 
@@ -244,142 +267,114 @@ class ToshibaAcDevice:
         await self.send_command_to_ac(command)
 
     @property
-    def ac_status(self):
+    def ac_status(self) -> ToshibaAcStatus:
         return self.fcu_state.ac_status
 
-    async def set_ac_status(self, val):
+    async def set_ac_status(self, val: ToshibaAcStatus) -> None:
         state = ToshibaAcFcuState()
         state.ac_status = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_mode(self):
+    def ac_mode(self) -> ToshibaAcMode:
         return self.fcu_state.ac_mode
 
-    async def set_ac_mode(self, val):
+    async def set_ac_mode(self, val: ToshibaAcMode) -> None:
         state = ToshibaAcFcuState()
         state.ac_mode = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_temperature(self):
-        # In SAVE mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
+    def ac_temperature(self) -> Optional[int]:
+        # In HEATING_8C mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
 
         ret = self.fcu_state.ac_temperature
 
-        if self.fcu_state.ac_mode == ToshibaAcFcuState.AcMode.HEAT:
-            if self.fcu_state.ac_merit_a_feature == ToshibaAcFcuState.AcMeritAFeature.HEATING_8C:
-                if self.fcu_state.ac_temperature not in [
-                    ToshibaAcFcuState.AcTemperature.NONE,
-                    ToshibaAcFcuState.AcTemperature.UNKNOWN,
-                ]:
-                    ret = ToshibaAcFcuState.AcTemperature(self.fcu_state.ac_temperature.value - 16)
+        if self.fcu_state.ac_mode == ToshibaAcMode.HEAT:
+            if self.fcu_state.ac_merit_a == ToshibaAcMeritA.HEATING_8C:
+                if self.fcu_state.ac_temperature != None:
+                    ret = ret - 16
 
-        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
-            return None
+        return ret
 
-        return ret.value
-
-    async def set_ac_temperature(self, val):
+    async def set_ac_temperature(self, val: Optional[int]) -> None:
         state = ToshibaAcFcuState()
-        state.ac_temperature = int(val)
+        state.ac_temperature = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_fan_mode(self):
+    def ac_fan_mode(self) -> ToshibaAcFanMode:
         return self.fcu_state.ac_fan_mode
 
-    async def set_ac_fan_mode(self, val):
+    async def set_ac_fan_mode(self, val: ToshibaAcFanMode) -> None:
         state = ToshibaAcFcuState()
         state.ac_fan_mode = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_swing_mode(self):
+    def ac_swing_mode(self) -> ToshibaAcSwingMode:
         return self.fcu_state.ac_swing_mode
 
-    async def set_ac_swing_mode(self, val):
+    async def set_ac_swing_mode(self, val: ToshibaAcSwingMode) -> None:
         state = ToshibaAcFcuState()
         state.ac_swing_mode = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_power_selection(self):
+    def ac_power_selection(self) -> ToshibaAcPowerSelection:
         return self.fcu_state.ac_power_selection
 
-    async def set_ac_power_selection(self, val):
+    async def set_ac_power_selection(self, val: ToshibaAcPowerSelection) -> None:
         state = ToshibaAcFcuState()
         state.ac_power_selection = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_merit_b_feature(self):
-        return self.fcu_state.ac_merit_b_feature
+    def ac_merit_b(self) -> ToshibaAcMeritB:
+        return self.fcu_state.ac_merit_b
 
-    async def set_ac_merit_b_feature(self, val):
-        if val != ToshibaAcFcuState.AcMeritBFeature.NONE and val not in self.supported_merit_b_features:
-            raise ToshibaAcDeviceError(
-                f'Trying to set unsupported merit b feature: {val.name.title().replace("_", " ")}'
-            )
-
+    async def set_ac_merit_b(self, val: ToshibaAcMeritB) -> None:
         state = ToshibaAcFcuState()
-        state.ac_merit_b_feature = val
+        state.ac_merit_b = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_merit_a_feature(self):
-        return self.fcu_state.ac_merit_a_feature
+    def ac_merit_a(self) -> ToshibaAcMeritA:
+        return self.fcu_state.ac_merit_a
 
-    async def set_ac_merit_a_feature(self, val):
-        if val != ToshibaAcFcuState.AcMeritAFeature.NONE and val not in self.supported_merit_a_features:
-            raise ToshibaAcDeviceError(
-                f'Trying to set unsupported merit a feature: {val.name.title().replace("_", " ")}'
-            )
-
+    async def set_ac_merit_a(self, val: ToshibaAcMeritA) -> None:
         state = ToshibaAcFcuState()
-        state.ac_merit_a_feature = val
+        state.ac_merit_a = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_air_pure_ion(self):
+    def ac_air_pure_ion(self) -> ToshibaAcAirPureIon:
         return self.fcu_state.ac_air_pure_ion
 
-    async def set_ac_air_pure_ion(self, val):
-        if not self.is_pure_ion_supported:
-            raise ToshibaAcDeviceError("Pure Ion feature is not supported by this device")
+    async def set_ac_air_pure_ion(self, val: ToshibaAcAirPureIon) -> None:
         state = ToshibaAcFcuState()
         state.ac_air_pure_ion = val
 
         await self.send_state_to_ac(state)
 
     @property
-    def ac_indoor_temperature(self):
-        ret = self.fcu_state.ac_indoor_temperature
-
-        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
-            return None
-
-        return ret.value
+    def ac_indoor_temperature(self) -> Optional[int]:
+        return self.fcu_state.ac_indoor_temperature
 
     @property
-    def ac_outdoor_temperature(self):
-        ret = self.fcu_state.ac_outdoor_temperature
-
-        if ret in [ToshibaAcFcuState.AcTemperature.NONE, ToshibaAcFcuState.AcTemperature.UNKNOWN]:
-            return None
-
-        return ret.value
+    def ac_outdoor_temperature(self) -> Optional[int]:
+        return self.fcu_state.ac_outdoor_temperature
 
     @property
-    def ac_self_cleaning(self):
+    def ac_self_cleaning(self) -> ToshibaAcSelfCleaning:
         return self.fcu_state.ac_self_cleaning
 
     @property
@@ -395,13 +390,5 @@ class ToshibaAcDevice:
         return self._on_energy_consumption_changed_callback
 
     @property
-    def supported_merit_a_features(self):
-        return self._supported_merit_a_features
-
-    @property
-    def supported_merit_b_features(self):
-        return self._supported_merit_b_features
-
-    @property
-    def is_pure_ion_supported(self):
-        return self._is_pure_ion_supported
+    def supported(self):
+        return self._supported
