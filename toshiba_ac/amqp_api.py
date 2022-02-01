@@ -18,8 +18,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ToshibaAcAmqpApi:
-    COMMANDS = ['CMD_FCU_FROM_AC', 'CMD_HEARTBEAT']
+    COMMANDS = ["CMD_FCU_FROM_AC", "CMD_HEARTBEAT"]
 
     def __init__(self, sas_token):
         self.sas_token = sas_token
@@ -40,15 +41,15 @@ class ToshibaAcAmqpApi:
         self.handlers[command] = handler
 
     def method_request_received(self, method_data):
-        if method_data.name != 'smmobile':
-            return logger.info(f'Unknown method name: {method_data.name} full data: {method_data.payload}')
+        if method_data.name != "smmobile":
+            return logger.info(f"Unknown method name: {method_data.name} full data: {method_data.payload}")
 
         data = method_data.payload
-        command = data['cmd']
+        command = data["cmd"]
         handler = self.handlers.get(command, None)
 
         if handler:
-            handler(data['sourceId'], data['messageId'], data['targetId'], data['payload'], data['timeStamp'])
+            handler(data["sourceId"], data["messageId"], data["targetId"], data["payload"], data["timeStamp"])
         else:
             logger.info(f'Unhandled command {command} with payload: {data["payload"]}')
 

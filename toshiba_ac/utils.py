@@ -15,6 +15,7 @@
 import asyncio
 import datetime
 
+
 async def async_sleep_until_next_multiply_of_minutes(minutes):
     next = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
     next_rounded = datetime.datetime(
@@ -24,7 +25,7 @@ async def async_sleep_until_next_multiply_of_minutes(minutes):
         hour=next.hour,
         minute=next.minute // minutes * minutes,
         second=0,
-        microsecond=0
+        microsecond=0,
     )
 
     await asyncio.sleep((next_rounded - datetime.datetime.now()).total_seconds())

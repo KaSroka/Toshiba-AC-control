@@ -20,7 +20,9 @@ from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
 import asyncio
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 class ToshibaAcDeviceManager:
     FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES = 10
@@ -32,7 +34,7 @@ class ToshibaAcDeviceManager:
         self.http_api = None
         self.reg_info = None
         self.amqp_api = None
-        self.device_id = self.username + '_' + (device_id or '3e6e4eb5f0e5aa46')
+        self.device_id = self.username + "_" + (device_id or "3e6e4eb5f0e5aa46")
         self.sas_token = sas_token
         self.devices = {}
         self.periodic_fetch_energy_consumption_task = None
@@ -50,8 +52,8 @@ class ToshibaAcDeviceManager:
                         self.sas_token = await self.http_api.register_client(self.device_id)
 
                     self.amqp_api = ToshibaAcAmqpApi(self.sas_token)
-                    self.amqp_api.register_command_handler('CMD_FCU_FROM_AC', self.handle_cmd_fcu_from_ac)
-                    self.amqp_api.register_command_handler('CMD_HEARTBEAT', self.handle_cmd_heartbeat)
+                    self.amqp_api.register_command_handler("CMD_FCU_FROM_AC", self.handle_cmd_fcu_from_ac)
+                    self.amqp_api.register_command_handler("CMD_HEARTBEAT", self.handle_cmd_heartbeat)
                     await self.amqp_api.connect()
 
                 except:
@@ -81,9 +83,11 @@ class ToshibaAcDeviceManager:
             await self.fetch_energy_consumption()
 
     async def fetch_energy_consumption(self):
-        consumptions = await self.http_api.get_devices_energy_consumption([ac_unique_id for ac_unique_id in self.devices.keys()])
+        consumptions = await self.http_api.get_devices_energy_consumption(
+            [ac_unique_id for ac_unique_id in self.devices.keys()]
+        )
 
-        logger.debug(f'Power consumption for devices: {consumptions}')
+        logger.debug(f"Power consumption for devices: {consumptions}")
 
         updates = []
 
@@ -93,13 +97,12 @@ class ToshibaAcDeviceManager:
 
         await asyncio.gather(*updates)
 
-
     async def get_devices(self):
         async with self.lock:
             if not self.devices:
                 devices_info = await self.http_api.get_devices()
 
-                logger.debug(f'Found devices: {devices_info}')
+                logger.debug(f"Found devices: {devices_info}")
 
                 connects = []
 
@@ -115,12 +118,12 @@ class ToshibaAcDeviceManager:
                         device_info.merit_feature,
                         device_info.ac_model_id,
                         self.amqp_api,
-                        self.http_api
+                        self.http_api,
                     )
 
                     connects.append(device.connect())
 
-                    logger.debug(f'Adding device {device!r}')
+                    logger.debug(f"Adding device {device!r}")
 
                     self.devices[device.ac_unique_id] = device
 
@@ -128,7 +131,9 @@ class ToshibaAcDeviceManager:
                 await self.fetch_energy_consumption()
 
                 if not self.periodic_fetch_energy_consumption_task:
-                    self.periodic_fetch_energy_consumption_task = self.loop.create_task(self.periodic_fetch_energy_consumption())
+                    self.periodic_fetch_energy_consumption_task = self.loop.create_task(
+                        self.periodic_fetch_energy_consumption()
+                    )
 
             return list(self.devices.values())
 

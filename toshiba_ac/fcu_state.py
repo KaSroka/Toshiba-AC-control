@@ -17,9 +17,12 @@ import struct
 
 _NONE_VAL = -1
 
+
 class ToshibaAcFcuState:
 
-    AcTemperature = Enum('AcTemperature', tuple((str(i), i) for i in range(-100, 100)) + (("NONE", _NONE_VAL), ("UNKNOWN", 0x7f)))
+    AcTemperature = Enum(
+        "AcTemperature", tuple((str(i), i) for i in range(-100, 100)) + (("NONE", _NONE_VAL), ("UNKNOWN", 0x7F))
+    )
 
     class AcNone(Enum):
         NONE = _NONE_VAL
@@ -65,7 +68,7 @@ class ToshibaAcFcuState:
 
     class AcPowerSelection(Enum):
         POWER_50 = 0x32
-        POWER_75 = 0x4b
+        POWER_75 = 0x4B
         POWER_100 = 0x64
         NONE = _NONE_VAL
 
@@ -73,7 +76,7 @@ class ToshibaAcFcuState:
         FIREPLACE_1 = 0x02
         FIREPLACE_2 = 0x03
         OFF = 0x00
-        NONE = 0x0f
+        NONE = 0x0F
 
     class AcMeritAFeature(Enum):
         HIGH_POWER = 0x01
@@ -83,9 +86,9 @@ class ToshibaAcFcuState:
         SLEEP_CARE = 0x05
         FLOOR = 0x06
         COMFORT = 0x07
-        CDU_SILENT_2 = 0x0a
+        CDU_SILENT_2 = 0x0A
         OFF = 0x00
-        NONE = 0x0f
+        NONE = 0x0F
 
     class AcAirPureIon(Enum):
         OFF = 0x10
@@ -119,50 +122,57 @@ class ToshibaAcFcuState:
         self.ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning.NONE
 
     def encode(self):
-        data = (self.ac_status,
-                self.ac_mode,
-                self.ac_temperature,
-                self.ac_fan_mode,
-                self.ac_swing_mode,
-                self.ac_power_selection,
-                self.ac_merit_b_feature,
-                self.ac_merit_a_feature,
-                self.ac_air_pure_ion,
-                self.ac_indoor_temperature,
-                self.ac_outdoor_temperature,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE,
-                self.ac_self_cleaning,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE,
-                ToshibaAcFcuState.AcNone.NONE)
-        encoded = struct.pack('bbbbbbbbbbbbbbbbbbbb', *[prop.value for prop in data]).hex()
-        return encoded[:12] + encoded[13] + encoded[15] + encoded[16:] # Merit A/B features are encoded using half bytes but our packing added them as bytes
-
+        data = (
+            self.ac_status,
+            self.ac_mode,
+            self.ac_temperature,
+            self.ac_fan_mode,
+            self.ac_swing_mode,
+            self.ac_power_selection,
+            self.ac_merit_b_feature,
+            self.ac_merit_a_feature,
+            self.ac_air_pure_ion,
+            self.ac_indoor_temperature,
+            self.ac_outdoor_temperature,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+            self.ac_self_cleaning,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+            ToshibaAcFcuState.AcNone.NONE,
+        )
+        encoded = struct.pack("bbbbbbbbbbbbbbbbbbbb", *[prop.value for prop in data]).hex()
+        return (
+            encoded[:12] + encoded[13] + encoded[15] + encoded[16:]
+        )  # Merit A/B features are encoded using half bytes but our packing added them as bytes
 
     def decode(self, hex_state):
-        extended_hex_state = hex_state[:12] + '0' + hex_state[12] + '0' + hex_state[13:] # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
-        data = struct.unpack('bbbbbbbbbbbbbbbbbbbb', bytes.fromhex(extended_hex_state))
-        (self.ac_status,
-        self.ac_mode,
-        self.ac_temperature,
-        self.ac_fan_mode,
-        self.ac_swing_mode,
-        self.ac_power_selection,
-        self.ac_merit_b_feature,
-        self.ac_merit_a_feature,
-        self.ac_air_pure_ion,
-        self.ac_indoor_temperature,
-        self.ac_outdoor_temperature,
-        _,
-        _,
-        _,
-        _,
-        self.ac_self_cleaning,
-        *_) = data
+        extended_hex_state = (
+            hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:]
+        )  # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
+        data = struct.unpack("bbbbbbbbbbbbbbbbbbbb", bytes.fromhex(extended_hex_state))
+        (
+            self.ac_status,
+            self.ac_mode,
+            self.ac_temperature,
+            self.ac_fan_mode,
+            self.ac_swing_mode,
+            self.ac_power_selection,
+            self.ac_merit_b_feature,
+            self.ac_merit_a_feature,
+            self.ac_air_pure_ion,
+            self.ac_indoor_temperature,
+            self.ac_outdoor_temperature,
+            _,
+            _,
+            _,
+            _,
+            self.ac_self_cleaning,
+            *_,
+        ) = data
 
     def update(self, hex_state):
         state_update = ToshibaAcFcuState.from_hex_state(hex_state)
@@ -209,7 +219,10 @@ class ToshibaAcFcuState:
             self.ac_indoor_temperature = state_update.ac_indoor_temperature
             changed = True
 
-        if state_update.ac_outdoor_temperature not in [ToshibaAcFcuState.AcTemperature.NONE, self.ac_outdoor_temperature]:
+        if state_update.ac_outdoor_temperature not in [
+            ToshibaAcFcuState.AcTemperature.NONE,
+            self.ac_outdoor_temperature,
+        ]:
             self.ac_outdoor_temperature = state_update.ac_outdoor_temperature
             changed = True
 
@@ -316,17 +329,17 @@ class ToshibaAcFcuState:
         self._ac_self_cleaning = ToshibaAcFcuState.AcSelfCleaning(val)
 
     def __str__(self):
-        res = f'AcStatus: {self.ac_status.name}'
-        res += f', AcMode: {self.ac_mode.name}'
-        res += f', AcTemperature: {self.ac_temperature.name}'
-        res += f', AcFanMode: {self.ac_fan_mode.name}'
-        res += f', AcSwingMode: {self.ac_swing_mode.name}'
-        res += f', AcPowerSelection: {self.ac_power_selection.name}'
-        res += f', AcMeritBFeature: {self.ac_merit_b_feature.name}'
-        res += f', AcMeritAFeature: {self.ac_merit_a_feature.name}'
-        res += f', AcAirPureIon: {self.ac_air_pure_ion.name}'
-        res += f', AcIndoorAcTemperature: {self.ac_indoor_temperature.name}'
-        res += f', AcOutdoorAcTemperature: {self.ac_outdoor_temperature.name}'
-        res += f', AcSelfCleaning: {self.ac_self_cleaning.name}'
+        res = f"AcStatus: {self.ac_status.name}"
+        res += f", AcMode: {self.ac_mode.name}"
+        res += f", AcTemperature: {self.ac_temperature.name}"
+        res += f", AcFanMode: {self.ac_fan_mode.name}"
+        res += f", AcSwingMode: {self.ac_swing_mode.name}"
+        res += f", AcPowerSelection: {self.ac_power_selection.name}"
+        res += f", AcMeritBFeature: {self.ac_merit_b_feature.name}"
+        res += f", AcMeritAFeature: {self.ac_merit_a_feature.name}"
+        res += f", AcAirPureIon: {self.ac_air_pure_ion.name}"
+        res += f", AcIndoorAcTemperature: {self.ac_indoor_temperature.name}"
+        res += f", AcOutdoorAcTemperature: {self.ac_outdoor_temperature.name}"
+        res += f", AcSelfCleaning: {self.ac_self_cleaning.name}"
 
         return res
