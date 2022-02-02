@@ -87,7 +87,14 @@ class ToshibaAcDeviceManager:
             [ac_unique_id for ac_unique_id in self.devices.keys()]
         )
 
-        logger.debug(f"Power consumption for devices: {consumptions}")
+        logger.debug(
+            "Power consumption for devices: {"
+            + " ,".join(
+                f"{self.devices[ac_unique_id]}: {consumption.energy_wh}Wh"
+                for ac_unique_id, consumption in consumptions.items()
+            )
+            + "}"
+        )
 
         updates = []
 
@@ -102,7 +109,16 @@ class ToshibaAcDeviceManager:
             if not self.devices:
                 devices_info = await self.http_api.get_devices()
 
-                logger.debug(f"Found devices: {devices_info}")
+                logger.debug(
+                    "Found devices: {"
+                    + " ,".join(
+                        f"{device.ac_name}: {{MeritFeature: {device.merit_feature}, "
+                        + f"Model id: {device.ac_model_id}, "
+                        + f"Firmware version: {device.firmware_version}, "
+                        + f"Initial state: {device.initial_ac_state}}}"
+                        for device in devices_info
+                    )
+                )
 
                 connects = []
 
@@ -123,7 +139,7 @@ class ToshibaAcDeviceManager:
 
                     connects.append(device.connect())
 
-                    logger.debug(f"Adding device {device!r}")
+                    logger.debug(f"Adding device {device.name}")
 
                     self.devices[device.ac_unique_id] = device
 

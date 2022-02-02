@@ -190,7 +190,7 @@ class ToshibaAcDevice:
         if self._ac_energy_consumption != val:
             self._ac_energy_consumption = val
 
-            logger.debug(f"[{self.name}] Energy consumption: {val}")
+            logger.debug(f"[{self.name}] New energy consumption: {val.energy_wh}Wh")
 
             await self.on_energy_consumption_changed_callback(self)
 
@@ -405,6 +405,3 @@ class ToshibaAcDevice:
     @property
     def is_pure_ion_supported(self):
         return self._is_pure_ion_supported
-
-    def __repr__(self):
-        return f"ToshibaAcDevice(name={self.name}, device_id={self.device_id}, ac_id={self.ac_id}, ac_unique_id={self.ac_unique_id})"

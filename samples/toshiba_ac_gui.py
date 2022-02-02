@@ -151,8 +151,7 @@ class App(tk.Tk):
 
     async def init(self):
         self.device_manager = ToshibaAcDeviceManager(self.loop, self.user, self.password, "3e6e4eb5f0e5aa40")
-        sas_token = await self.device_manager.connect()
-        logger.debug(f"AMQP SAS token: {sas_token}")
+        await self.device_manager.connect()
 
         devices = await self.device_manager.get_devices()
 
