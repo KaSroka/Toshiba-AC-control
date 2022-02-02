@@ -80,15 +80,15 @@ class ToshibaAcHttpApi:
 
         if post:
             method = lambda: self.session.post(url, params=get, json=post, headers=headers)
-            logger.debug(f"Sending POST to {url} with params={get}, json={post}, headers={headers}")
+            logger.debug(f"Sending POST to {url}")
 
         else:
             method = lambda: self.session.get(url, params=get, headers=headers)
-            logger.debug(f"Sending GET to {url} with params={get}, headers={headers}")
+            logger.debug(f"Sending GET to {url}")
 
         async with method() as response:
             json = await response.json()
-            logger.debug(f"Response code: {response.status}, JSON: {json}")
+            logger.debug(f"Response code: {response.status}")
 
             err_type = ToshibaAcHttpApiError
 
