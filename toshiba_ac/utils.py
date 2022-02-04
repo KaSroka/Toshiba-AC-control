@@ -14,9 +14,10 @@
 
 import asyncio
 import datetime
+from enum import Enum
 
 
-async def async_sleep_until_next_multiply_of_minutes(minutes):
+async def async_sleep_until_next_multiply_of_minutes(minutes: int) -> None:
     next = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
     next_rounded = datetime.datetime(
         year=next.year,
@@ -31,5 +32,5 @@ async def async_sleep_until_next_multiply_of_minutes(minutes):
     await asyncio.sleep((next_rounded - datetime.datetime.now()).total_seconds())
 
 
-def pretty_enum_name(enum):
+def pretty_enum_name(enum: Enum) -> str:
     return enum.name.title().replace("_", " ")

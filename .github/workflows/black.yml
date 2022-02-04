@@ -9,6 +9,7 @@ on:
 
 jobs:
   black:
+    name: Black
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

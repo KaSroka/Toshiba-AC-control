@@ -13,7 +13,15 @@
 # limitations under the License.
 
 
+from dataclasses import dataclass
 from enum import Enum, auto
+from datetime import datetime
+
+
+@dataclass
+class ToshibaAcDeviceEnergyConsumption:
+    energy_wh: float
+    since: datetime
 
 
 class ToshibaAcStatus(Enum):

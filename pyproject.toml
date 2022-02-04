@@ -7,3 +7,10 @@ requires = [
 [tool.black]
 line-length = 120
 include = '\.pyi?$'
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+exclude = 'setup.py|versioneer.py|toshiba_ac/_version.py|samples'

@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from __future__ import annotations
+
 import struct
+import typing as t
 
 from toshiba_ac.device_properties import (
     ToshibaAcAirPureIon,
@@ -36,15 +38,16 @@ class ToshibaAcFcuState:
 
     class AcTemperature:
         @staticmethod
-        def from_raw(raw: int) -> Optional[int]:
-            return {127: None, -128: None, ToshibaAcFcuState.NONE_VAL_SIGNED: None, 126: -1}.get(raw, raw)
+        def from_raw(raw: int) -> t.Optional[int]:
+            raw_to_temp: t.Dict[int, t.Optional[int]] = {i: i for i in range(-128, 128)}
+            raw_to_temp.update({127: None, -128: None, ToshibaAcFcuState.NONE_VAL_SIGNED: None, 126: -1})
+            return raw_to_temp[raw]
 
         @staticmethod
-        def to_raw(temperature: Optional[int]) -> int:
-            return {
-                None: ToshibaAcFcuState.NONE_VAL_SIGNED,
-                -1: 126,
-            }.get(temperature, temperature)
+        def to_raw(temperature: t.Optional[int]) -> int:
+            temp_to_raw: t.Dict[t.Optional[int], int] = {i: i for i in range(-128, 128)}
+            temp_to_raw.update({None: ToshibaAcFcuState.NONE_VAL_SIGNED, -1: 126})
+            return temp_to_raw[temperature]
 
     class AcStatus:
         @staticmethod
@@ -254,12 +257,12 @@ class ToshibaAcFcuState:
             }[self_cleaning]
 
     @classmethod
-    def from_hex_state(cls, hex_state):
+    def from_hex_state(cls, hex_state: str) -> ToshibaAcFcuState:
         state = cls()
         state.decode(hex_state)
         return state
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ac_status = ToshibaAcFcuState.NONE_VAL
         self._ac_mode = ToshibaAcFcuState.NONE_VAL
         self._ac_temperature = ToshibaAcFcuState.NONE_VAL_SIGNED
@@ -381,11 +384,11 @@ class ToshibaAcFcuState:
         self._ac_mode = ToshibaAcFcuState.AcMode.to_raw(val)
 
     @property
-    def ac_temperature(self) -> Optional[int]:
+    def ac_temperature(self) -> t.Optional[int]:
         return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_temperature)
 
     @ac_temperature.setter
-    def ac_temperature(self, val: Optional[int]) -> None:
+    def ac_temperature(self, val: t.Optional[int]) -> None:
         self._ac_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
@@ -437,19 +440,19 @@ class ToshibaAcFcuState:
         self._ac_air_pure_ion = ToshibaAcFcuState.AcAirPureIon.to_raw(val)
 
     @property
-    def ac_indoor_temperature(self) -> Optional[int]:
+    def ac_indoor_temperature(self) -> t.Optional[int]:
         return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_indoor_temperature)
 
     @ac_indoor_temperature.setter
-    def ac_indoor_temperature(self, val: Optional[int]) -> None:
+    def ac_indoor_temperature(self, val: t.Optional[int]) -> None:
         self._ac_indoor_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
-    def ac_outdoor_temperature(self) -> Optional[int]:
+    def ac_outdoor_temperature(self) -> t.Optional[int]:
         return ToshibaAcFcuState.AcTemperature.from_raw(self._ac_outdoor_temperature)
 
     @ac_outdoor_temperature.setter
-    def ac_outdoor_temperature(self, val: Optional[int]) -> None:
+    def ac_outdoor_temperature(self, val: t.Optional[int]) -> None:
         self._ac_outdoor_temperature = ToshibaAcFcuState.AcTemperature.to_raw(val)
 
     @property
