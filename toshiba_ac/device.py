@@ -193,11 +193,6 @@ class ToshibaAcDevice:
 
         supported_for_mode = self.supported.for_ac_mode(future_state.ac_mode)
 
-        logger.error(str(supported_for_mode.ac_merit_b))
-        logger.error(str(future_state.ac_merit_b))
-        logger.error(str(self.ac_merit_b))
-        logger.error(str(future_state))
-
         def warn_if_same_mode(msg):
             if future_state.ac_mode == self.ac_mode:
                 logger.warning(msg)
