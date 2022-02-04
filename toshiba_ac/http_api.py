@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import aiohttp
+import datetime
+import logging
+import typing as t
 from dataclasses import dataclass
 
-import datetime
+import aiohttp
 
-import logging
+from toshiba_ac.device_properties import ToshibaAcDeviceEnergyConsumption
 
 logger = logging.getLogger(__name__)
-
-from toshiba_ac.device import ToshibaAcDeviceEnergyConsumption
-
-import typing
 
 
 @dataclass
@@ -39,8 +37,8 @@ class ToshibaAcDeviceInfo:
 
 @dataclass
 class ToshibaAcDeviceAdditionalInfo:
-    cdu: typing.Optional[str]
-    fcu: typing.Optional[str]
+    cdu: t.Optional[str]
+    fcu: t.Optional[str]
 
 
 class ToshibaAcHttpApiError(Exception):
@@ -59,34 +57,45 @@ class ToshibaAcHttpApi:
     AC_STATE_PATH = "/api/AC/GetCurrentACState"
     AC_ENERGY_CONSUMPTION_PATH = "/api/AC/GetGroupACEnergyConsumption"
 
-    def __init__(self, username, password):
+    def __init__(self, username: str, password: str) -> None:
         self.username = username
         self.password = password
-        self.access_token = None
-        self.access_token_type = None
-        self.consumer_id = None
-        self.session = None
+        self.access_token: t.Optional[str] = None
+        self.access_token_type: t.Optional[str] = None
+        self.consumer_id: t.Optional[str] = None
+        self.session: t.Optional[aiohttp.ClientSession] = None
 
-    async def request_api(self, path, get=None, post=None, headers=None):
-        if not self.session:
-            self.session = aiohttp.ClientSession()
+    async def request_api(
+        self,
+        path: str,
+        get: t.Any = None,
+        post: t.Any = None,
+        headers: t.Any = None,
+    ) -> t.Any:
+        if not isinstance(headers, dict):
+            if not self.access_token_type or not self.access_token:
+                raise ToshibaAcHttpApiError("Failed to send request, missing access token")
 
-        if not headers:
             headers = {}
             headers["Content-Type"] = "application/json"
             headers["Authorization"] = self.access_token_type + " " + self.access_token
 
         url = self.BASE_URL + path
 
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+
+        method_args = {"params": get, "headers": headers}
+
         if post:
-            method = lambda: self.session.post(url, params=get, json=post, headers=headers)
             logger.debug(f"Sending POST to {url}")
-
+            method_args["json"] = post
+            method = self.session.post
         else:
-            method = lambda: self.session.get(url, params=get, headers=headers)
             logger.debug(f"Sending GET to {url}")
+            method = self.session.get
 
-        async with method() as response:
+        async with method(url, **method_args) as response:
             json = await response.json()
             logger.debug(f"Response code: {response.status}")
 
@@ -101,7 +110,7 @@ class ToshibaAcHttpApi:
 
             raise err_type(json["Message"])
 
-    async def connect(self):
+    async def connect(self) -> None:
         headers = {"Content-Type": "application/json"}
         post = {"Username": self.username, "Password": self.password}
 
@@ -111,12 +120,15 @@ class ToshibaAcHttpApi:
         self.access_token_type = res["token_type"]
         self.consumer_id = res["consumerId"]
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         if self.session:
             await self.session.close()
             self.session = None
 
-    async def get_devices(self):
+    async def get_devices(self) -> t.List[ToshibaAcDeviceInfo]:
+        if not self.consumer_id:
+            raise ToshibaAcHttpApiError("Failed to send request, missing consumer id")
+
         get = {"consumerId": self.consumer_id}
 
         res = await self.request_api(self.AC_MAPPING_PATH, get=get)
@@ -139,16 +151,22 @@ class ToshibaAcHttpApi:
 
         return devices
 
-    async def get_device_state(self, ac_id):
+    async def get_device_state(self, ac_id: str) -> str:
         get = {
             "ACId": ac_id,
         }
 
         res = await self.request_api(self.AC_STATE_PATH, get=get)
 
+        if "ACStateData" not in res:
+            raise ToshibaAcHttpApiError("Missing ACStateData in response")
+
+        if not isinstance(res["ACStateData"], str):
+            raise ToshibaAcHttpApiError("Malformed ACStateData in response")
+
         return res["ACStateData"]
 
-    async def get_device_additional_info(self, ac_id):
+    async def get_device_additional_info(self, ac_id: str) -> ToshibaAcDeviceAdditionalInfo:
         get = {
             "ACId": ac_id,
         }
@@ -167,7 +185,9 @@ class ToshibaAcHttpApi:
 
         return ToshibaAcDeviceAdditionalInfo(cdu=cdu, fcu=fcu)
 
-    async def get_devices_energy_consumption(self, ac_unique_ids):
+    async def get_devices_energy_consumption(
+        self, ac_unique_ids: t.List[str]
+    ) -> t.Dict[str, ToshibaAcDeviceEnergyConsumption]:
         year = int(datetime.datetime.now().year)
         since = datetime.datetime(year, 1, 1).astimezone(datetime.timezone.utc)
 
@@ -195,9 +215,15 @@ class ToshibaAcHttpApi:
 
         return ret
 
-    async def register_client(self, device_id):
+    async def register_client(self, device_id: str) -> str:
         post = {"DeviceID": device_id, "DeviceType": "1", "Username": self.username}
 
         res = await self.request_api(self.REGISTER_PATH, post=post)
+
+        if "SasToken" not in res:
+            raise ToshibaAcHttpApiError("Missing SasToken in response")
+
+        if not isinstance(res["SasToken"], str):
+            raise ToshibaAcHttpApiError("Malformed SasToken in response")
 
         return res["SasToken"]

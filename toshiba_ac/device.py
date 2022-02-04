@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from __future__ import annotations
+
+import asyncio
+import logging
+import typing as t
+from dataclasses import dataclass
+
+from toshiba_ac.amqp_api import ToshibaAcAmqpApi
+from toshiba_ac.device_features import ToshibaAcFeatures
 from toshiba_ac.device_properties import (
     ToshibaAcAirPureIon,
+    ToshibaAcDeviceEnergyConsumption,
     ToshibaAcFanMode,
     ToshibaAcMeritA,
     ToshibaAcMeritB,
@@ -25,15 +34,8 @@ from toshiba_ac.device_properties import (
     ToshibaAcSwingMode,
 )
 from toshiba_ac.fcu_state import ToshibaAcFcuState
+from toshiba_ac.http_api import ToshibaAcHttpApi
 from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name
-from toshiba_ac.device_features import ToshibaAcFeatures
-
-from azure.iot.device import Message
-from dataclasses import dataclass
-import asyncio
-
-import datetime
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -42,37 +44,31 @@ class ToshibaAcDeviceError(Exception):
     pass
 
 
-@dataclass
-class ToshibaAcDeviceEnergyConsumption:
-    energy_wh: float
-    since: datetime.datetime
-
-
 class ToshibaAcDeviceCallback:
-    def __init__(self):
-        self.callbacks = []
+    def __init__(self) -> None:
+        self.callbacks: t.List[t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]] = []
 
-    def add(self, callback):
+    def add(self, callback: t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]) -> bool:
         if callback not in self.callbacks:
             self.callbacks.append(callback)
             return True
 
         return False
 
-    def remove(self, callback):
+    def remove(self, callback: t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]) -> bool:
         if callback in self.callbacks:
             self.callbacks.remove(callback)
             return True
 
         return False
 
-    async def __call__(self, *args, **kwargs):
+    async def __call__(self, dev: ToshibaAcDevice) -> None:
         for callback in self.callbacks:
             asyncs = []
             if asyncio.iscoroutinefunction(callback):
-                asyncs.append(callback(*args, **kwargs))
+                asyncs.append(t.cast(t.Awaitable[None], callback(dev)))
             else:
-                callback(*args, **kwargs)
+                callback(dev)
 
             await asyncio.gather(*asyncs)
 
@@ -82,18 +78,18 @@ class ToshibaAcDevice:
 
     def __init__(
         self,
-        loop,
-        name,
-        device_id,
-        ac_id,
-        ac_unique_id,
-        initial_ac_state,
-        firmware_version,
-        merit_feature,
-        ac_model_id,
-        amqp_api,
-        http_api,
-    ):
+        loop: asyncio.AbstractEventLoop,
+        name: str,
+        device_id: str,
+        ac_id: str,
+        ac_unique_id: str,
+        initial_ac_state: str,
+        firmware_version: str,
+        merit_feature: str,
+        ac_model_id: str,
+        amqp_api: ToshibaAcAmqpApi,
+        http_api: ToshibaAcHttpApi,
+    ) -> None:
         self.loop = loop
         self.name = name
         self.device_id = device_id
@@ -105,53 +101,53 @@ class ToshibaAcDevice:
 
         self.fcu_state = ToshibaAcFcuState.from_hex_state(initial_ac_state)
 
-        self.cdu = None
-        self.fcu = None
+        self.cdu: t.Optional[str] = None
+        self.fcu: t.Optional[str] = None
         self._supported = ToshibaAcFeatures.from_merit_string_and_model(merit_feature, ac_model_id)
         self._on_state_changed_callback = ToshibaAcDeviceCallback()
         self._on_energy_consumption_changed_callback = ToshibaAcDeviceCallback()
-        self._ac_energy_consumption = None
+        self._ac_energy_consumption: t.Optional[ToshibaAcDeviceEnergyConsumption] = None
 
         logger.debug(f"[{self.name}] {self.supported}")
 
-    async def connect(self):
+    async def connect(self) -> None:
         await self.load_additional_device_info()
         self.periodic_reload_state_task = self.loop.create_task(self.periodic_state_reload())
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         self.periodic_reload_state_task.cancel()
 
-    async def load_additional_device_info(self):
+    async def load_additional_device_info(self) -> None:
         additional_info = await self.http_api.get_device_additional_info(self.ac_id)
         self.cdu = additional_info.cdu
         self.fcu = additional_info.fcu
         await self.on_state_changed_callback(self)
 
-    async def state_reload(self):
+    async def state_reload(self) -> None:
         hex_state = await self.http_api.get_device_state(self.ac_id)
         logger.debug(f"[{self.name}] AC state from HTTP: {hex_state}")
         if self.fcu_state.update(hex_state):
             await self.state_changed()
 
-    async def state_changed(self):
+    async def state_changed(self) -> None:
         logger.info(f"[{self.name}] Current state: {self.fcu_state}")
         await self.on_state_changed_callback(self)
 
-    async def periodic_state_reload(self):
+    async def periodic_state_reload(self) -> None:
         while True:
             await async_sleep_until_next_multiply_of_minutes(self.STATE_RELOAD_PERIOD_MINUTES)
             await self.state_reload()
 
-    async def handle_cmd_fcu_from_ac(self, payload):
+    async def handle_cmd_fcu_from_ac(self, payload: t.Any) -> None:
         logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')
         if self.fcu_state.update(payload["data"]):
             await self.state_changed()
 
-    async def handle_cmd_heartbeat(self, payload):
+    async def handle_cmd_heartbeat(self, payload: t.Any) -> None:
         hb_data = {k: int(v, base=16) for k, v in payload.items()}
         logger.debug(f"[{self.name}] AC heartbeat from AMQP: {hb_data}")
 
-    async def handle_update_ac_energy_consumption(self, val):
+    async def handle_update_ac_energy_consumption(self, val: ToshibaAcDeviceEnergyConsumption) -> None:
         if self._ac_energy_consumption != val:
             self._ac_energy_consumption = val
 
@@ -159,25 +155,7 @@ class ToshibaAcDevice:
 
             await self.on_energy_consumption_changed_callback(self)
 
-    def create_cmd_fcu_to_ac(self, hex_state):
-        return {
-            "sourceId": self.device_id,
-            "messageId": "0000000",
-            "targetId": [self.ac_unique_id],
-            "cmd": "CMD_FCU_TO_AC",
-            "payload": {"data": hex_state},
-            "timeStamp": "0000000",
-        }
-
-    async def send_command_to_ac(self, command):
-        msg = Message(str(command))
-        msg.custom_properties["type"] = "mob"
-        msg.content_type = "application/json"
-        msg.content_encoding = "utf-8"
-
-        await self.amqp_api.send_message(msg)
-
-    async def send_state_to_ac(self, state: ToshibaAcFcuState):
+    async def send_state_to_ac(self, state: ToshibaAcFcuState) -> None:
         future_state = ToshibaAcFcuState.from_hex_state(self.fcu_state.encode())
         future_state.update(state.encode())
 
@@ -193,7 +171,7 @@ class ToshibaAcDevice:
 
         supported_for_mode = self.supported.for_ac_mode(future_state.ac_mode)
 
-        def warn_if_same_mode(msg):
+        def warn_if_same_mode(msg: str) -> None:
             if future_state.ac_mode == self.ac_mode:
                 logger.warning(msg)
 
@@ -258,8 +236,16 @@ class ToshibaAcDevice:
 
         logger.debug(f"[{self.name}] Sending command: {state}")
 
-        command = self.create_cmd_fcu_to_ac(state.encode())
-        await self.send_command_to_ac(command)
+        fcu_to_ac = {
+            "sourceId": self.device_id,
+            "messageId": "0000000",
+            "targetId": [self.ac_unique_id],
+            "cmd": "CMD_FCU_TO_AC",
+            "payload": {"data": state.encode()},
+            "timeStamp": "0000000",
+        }
+
+        await self.amqp_api.send_message(str(fcu_to_ac))
 
     @property
     def ac_status(self) -> ToshibaAcStatus:
@@ -282,19 +268,19 @@ class ToshibaAcDevice:
         await self.send_state_to_ac(state)
 
     @property
-    def ac_temperature(self) -> Optional[int]:
+    def ac_temperature(self) -> t.Optional[int]:
         # In HEATING_8C mode reported temperatures are 16 degrees higher than actual setpoint (only when heating)
 
         ret = self.fcu_state.ac_temperature
 
         if self.fcu_state.ac_mode == ToshibaAcMode.HEAT:
             if self.fcu_state.ac_merit_a == ToshibaAcMeritA.HEATING_8C:
-                if self.fcu_state.ac_temperature != None:
+                if isinstance(ret, int):
                     ret = ret - 16
 
         return ret
 
-    async def set_ac_temperature(self, val: Optional[int]) -> None:
+    async def set_ac_temperature(self, val: t.Optional[int]) -> None:
         state = ToshibaAcFcuState()
         state.ac_temperature = val
 
@@ -361,11 +347,11 @@ class ToshibaAcDevice:
         await self.send_state_to_ac(state)
 
     @property
-    def ac_indoor_temperature(self) -> Optional[int]:
+    def ac_indoor_temperature(self) -> t.Optional[int]:
         return self.fcu_state.ac_indoor_temperature
 
     @property
-    def ac_outdoor_temperature(self) -> Optional[int]:
+    def ac_outdoor_temperature(self) -> t.Optional[int]:
         return self.fcu_state.ac_outdoor_temperature
 
     @property
@@ -373,17 +359,17 @@ class ToshibaAcDevice:
         return self.fcu_state.ac_self_cleaning
 
     @property
-    def ac_energy_consumption(self):
+    def ac_energy_consumption(self) -> t.Optional[ToshibaAcDeviceEnergyConsumption]:
         return self._ac_energy_consumption
 
     @property
-    def on_state_changed_callback(self):
+    def on_state_changed_callback(self) -> ToshibaAcDeviceCallback:
         return self._on_state_changed_callback
 
     @property
-    def on_energy_consumption_changed_callback(self):
+    def on_energy_consumption_changed_callback(self) -> ToshibaAcDeviceCallback:
         return self._on_energy_consumption_changed_callback
 
     @property
-    def supported(self):
+    def supported(self) -> ToshibaAcFeatures:
         return self._supported

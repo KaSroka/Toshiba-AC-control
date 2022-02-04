@@ -16,8 +16,7 @@ from __future__ import annotations
 
 import logging
 import struct
-
-from typing import List
+import typing as t
 
 from toshiba_ac.device_properties import (
     ToshibaAcAirPureIon,
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 class ToshibaAcFeatures:
     MERIT_BITS_STRUCT = struct.Struct("????????????????")
 
-    DISABLED_AC_MERIT_B_FOR_MODE = {
+    DISABLED_AC_MERIT_B_FOR_MODE: t.Dict[ToshibaAcMode, t.List[ToshibaAcMeritB]] = {
         ToshibaAcMode.AUTO: [
             ToshibaAcMeritB.FIREPLACE_1,
             ToshibaAcMeritB.FIREPLACE_2,
@@ -58,7 +57,7 @@ class ToshibaAcFeatures:
         ],
     }
 
-    DISABLED_AC_MERIT_A_FOR_MODE = {
+    DISABLED_AC_MERIT_A_FOR_MODE: t.Dict[ToshibaAcMode, t.List[ToshibaAcMeritA]] = {
         ToshibaAcMode.AUTO: [
             ToshibaAcMeritA.HEATING_8C,
             ToshibaAcMeritA.SLEEP_CARE,
@@ -92,17 +91,17 @@ class ToshibaAcFeatures:
 
     def __init__(
         self,
-        ac_status: List[ToshibaAcStatus],
-        ac_mode: List[ToshibaAcMode],
-        ac_fan_mode: List[ToshibaAcFanMode],
-        ac_swing_mode: List[ToshibaAcSwingMode],
-        ac_power_selection: List[ToshibaAcPowerSelection],
-        ac_merit_b: List[ToshibaAcMeritB],
-        ac_merit_a: List[ToshibaAcMeritA],
-        ac_air_pure_ion: List[ToshibaAcAirPureIon],
-        ac_self_cleaning: List[ToshibaAcSelfCleaning],
+        ac_status: t.List[ToshibaAcStatus],
+        ac_mode: t.List[ToshibaAcMode],
+        ac_fan_mode: t.List[ToshibaAcFanMode],
+        ac_swing_mode: t.List[ToshibaAcSwingMode],
+        ac_power_selection: t.List[ToshibaAcPowerSelection],
+        ac_merit_b: t.List[ToshibaAcMeritB],
+        ac_merit_a: t.List[ToshibaAcMeritA],
+        ac_air_pure_ion: t.List[ToshibaAcAirPureIon],
+        ac_self_cleaning: t.List[ToshibaAcSelfCleaning],
         ac_energy_report: bool,
-    ):
+    ) -> None:
         self._ac_status = ac_status
         self._ac_mode = ac_mode
         self._ac_fan_mode = ac_fan_mode
@@ -157,7 +156,7 @@ class ToshibaAcFeatures:
                     ToshibaAcMode.FAN,
                     ToshibaAcMode.HEAT,
                 ],
-            }[tuple(merit_bits[6:8])]
+            }[(merit_bits[6], merit_bits[7])]
         )
 
         if ac_model_id in ("2", "3"):
@@ -231,39 +230,39 @@ class ToshibaAcFeatures:
         )
 
     @property
-    def ac_status(self) -> List[ToshibaAcStatus]:
+    def ac_status(self) -> t.List[ToshibaAcStatus]:
         return self._ac_status
 
     @property
-    def ac_mode(self) -> List[ToshibaAcMode]:
+    def ac_mode(self) -> t.List[ToshibaAcMode]:
         return self._ac_mode
 
     @property
-    def ac_fan_mode(self) -> List[ToshibaAcFanMode]:
+    def ac_fan_mode(self) -> t.List[ToshibaAcFanMode]:
         return self._ac_fan_mode
 
     @property
-    def ac_swing_mode(self) -> List[ToshibaAcSwingMode]:
+    def ac_swing_mode(self) -> t.List[ToshibaAcSwingMode]:
         return self._ac_swing_mode
 
     @property
-    def ac_power_selection(self) -> List[ToshibaAcPowerSelection]:
+    def ac_power_selection(self) -> t.List[ToshibaAcPowerSelection]:
         return self._ac_power_selection
 
     @property
-    def ac_merit_b(self) -> List[ToshibaAcMeritB]:
+    def ac_merit_b(self) -> t.List[ToshibaAcMeritB]:
         return self._ac_merit_b
 
     @property
-    def ac_merit_a(self) -> List[ToshibaAcMeritA]:
+    def ac_merit_a(self) -> t.List[ToshibaAcMeritA]:
         return self._ac_merit_a
 
     @property
-    def ac_air_pure_ion(self) -> List[ToshibaAcAirPureIon]:
+    def ac_air_pure_ion(self) -> t.List[ToshibaAcAirPureIon]:
         return self._ac_air_pure_ion
 
     @property
-    def ac_self_cleaning(self) -> List[ToshibaAcSelfCleaning]:
+    def ac_self_cleaning(self) -> t.List[ToshibaAcSelfCleaning]:
         return self._ac_self_cleaning
 
     @property

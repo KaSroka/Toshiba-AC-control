@@ -1,0 +1,29 @@
+name: Check types
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ main ]
+
+jobs:
+  build-n-publish:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@master
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v1
+      with:
+        python-version: "3.9"
+    - name: Install mypy and toshiba-ac
+      run: |
+        ls -alh
+        pwd
+        pip install --user wheel
+        pip install --user mypy==0.910
+        pip install --user -e .
+    - name: Check types
+      run: mypy .
