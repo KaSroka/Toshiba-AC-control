@@ -75,24 +75,47 @@ class ToshibaAcDeviceManager:
 
     async def shutdown(self) -> None:
         async with self.lock:
+            tasks: t.List[t.Awaitable[None]] = []
+
             if self.periodic_fetch_energy_consumption_task:
                 self.periodic_fetch_energy_consumption_task.cancel()
-                self.periodic_fetch_energy_consumption_task = None
+                tasks.append(self.periodic_fetch_energy_consumption_task)
 
-            await asyncio.gather(*[device.shutdown() for device in self.devices.values()])
+            tasks.extend(device.shutdown() for device in self.devices.values())
 
             if self.amqp_api:
-                await self.amqp_api.shutdown()
-                self.amqp_api = None
+                tasks.append(self.amqp_api.shutdown())
 
             if self.http_api:
-                await self.http_api.shutdown()
+                tasks.append(self.http_api.shutdown())
+
+            try:
+                if tasks:
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    def raise_all_errors(res: t.Any, *args: t.Any) -> None:
+                        try:
+                            if isinstance(res, Exception):
+                                raise res
+                        finally:
+                            if args:
+                                raise_all_errors(*args)
+
+                    raise_all_errors(*results)
+            finally:
+                self.periodic_fetch_energy_consumption_task = None
+                self.amqp_api = None
                 self.http_api = None
 
     async def periodic_fetch_energy_consumption(self) -> None:
         while True:
             await async_sleep_until_next_multiply_of_minutes(self.FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES)
-            await self.fetch_energy_consumption()
+            try:
+                await self.fetch_energy_consumption()
+            except asyncio.CancelledError:
+                raise
+            except:
+                pass
 
     async def fetch_energy_consumption(self) -> None:
         if not self.http_api:

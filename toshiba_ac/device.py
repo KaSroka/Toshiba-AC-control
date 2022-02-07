@@ -116,6 +116,7 @@ class ToshibaAcDevice:
 
     async def shutdown(self) -> None:
         self.periodic_reload_state_task.cancel()
+        await self.periodic_reload_state_task
 
     async def load_additional_device_info(self) -> None:
         additional_info = await self.http_api.get_device_additional_info(self.ac_id)
@@ -136,7 +137,12 @@ class ToshibaAcDevice:
     async def periodic_state_reload(self) -> None:
         while True:
             await async_sleep_until_next_multiply_of_minutes(self.STATE_RELOAD_PERIOD_MINUTES)
-            await self.state_reload()
+            try:
+                await self.state_reload()
+            except asyncio.CancelledError:
+                raise
+            except:
+                pass
 
     async def handle_cmd_fcu_from_ac(self, payload: t.Any) -> None:
         logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')
