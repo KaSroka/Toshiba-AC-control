@@ -59,7 +59,8 @@ class App(tk.Tk):
         self.tab_control = ttk.Notebook()
         self.devices = {}
 
-        self.loop.create_task(self.init())
+        # This is called before loop is started so we can use run_until_complete
+        self.loop.run_until_complete(asyncio.gather(self.init()))
 
     def populate_device_tab_enum(self, dev_tab, var_name, enum, setter, row):
         string_var = tk.StringVar()
