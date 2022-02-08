@@ -19,9 +19,9 @@ import logging
 import typing as t
 from dataclasses import dataclass
 
-from toshiba_ac.amqp_api import ToshibaAcAmqpApi
-from toshiba_ac.device_features import ToshibaAcFeatures
-from toshiba_ac.device_properties import (
+from toshiba_ac.device.fcu_state import ToshibaAcFcuState
+from toshiba_ac.device.features import ToshibaAcFeatures
+from toshiba_ac.device.properties import (
     ToshibaAcAirPureIon,
     ToshibaAcDeviceEnergyConsumption,
     ToshibaAcFanMode,
@@ -33,9 +33,9 @@ from toshiba_ac.device_properties import (
     ToshibaAcStatus,
     ToshibaAcSwingMode,
 )
-from toshiba_ac.fcu_state import ToshibaAcFcuState
-from toshiba_ac.http_api import ToshibaAcHttpApi
 from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name
+from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi
+from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
 logger = logging.getLogger(__name__)
 
