@@ -16,10 +16,10 @@ import asyncio
 import logging
 import typing as t
 
-from toshiba_ac.amqp_api import ToshibaAcAmqpApi
 from toshiba_ac.device import ToshibaAcDevice
-from toshiba_ac.http_api import ToshibaAcHttpApi
 from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
+from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi
+from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
 logger = logging.getLogger(__name__)
 

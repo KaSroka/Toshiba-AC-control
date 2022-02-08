@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import asyncio
+import logging
+import os
 import tkinter as tk
 from tkinter import ttk
 
-import argparse
-import os
-
-from toshiba_ac.device_manager import ToshibaAcDeviceManager
-
-import logging
-
-from toshiba_ac.device_properties import (
+from toshiba_ac.device.properties import (
     ToshibaAcAirPureIon,
     ToshibaAcFanMode,
     ToshibaAcMeritA,
@@ -33,6 +29,7 @@ from toshiba_ac.device_properties import (
     ToshibaAcStatus,
     ToshibaAcSwingMode,
 )
+from toshiba_ac.device_manager import ToshibaAcDeviceManager
 
 toshiba_logger = logging.getLogger("toshiba_ac")
 logging.basicConfig(level=logging.WARNING, format="[%(asctime)s] %(levelname)-8s %(name)s: %(message)s")

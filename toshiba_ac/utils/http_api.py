@@ -18,8 +18,7 @@ import typing as t
 from dataclasses import dataclass
 
 import aiohttp
-
-from toshiba_ac.device_properties import ToshibaAcDeviceEnergyConsumption
+from toshiba_ac.device.properties import ToshibaAcDeviceEnergyConsumption
 
 logger = logging.getLogger(__name__)
 
