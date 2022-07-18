@@ -33,13 +33,11 @@ class ToshibaAcDeviceManager:
 
     def __init__(
         self,
-        loop: asyncio.AbstractEventLoop,
         username: str,
         password: str,
         device_id: t.Optional[str] = None,
         sas_token: t.Optional[str] = None,
     ):
-        self.loop = loop
         self.username = username
         self.password = password
         self.http_api: t.Optional[ToshibaAcHttpApi] = None
@@ -50,6 +48,7 @@ class ToshibaAcDeviceManager:
         self.devices: t.Dict[str, ToshibaAcDevice] = {}
         self.periodic_fetch_energy_consumption_task: t.Optional[asyncio.Task[None]] = None
         self.lock = asyncio.Lock()
+        self.loop = asyncio.get_running_loop()
 
     async def connect(self) -> str:
         try:
@@ -165,7 +164,6 @@ class ToshibaAcDeviceManager:
 
                 for device_info in devices_info:
                     device = ToshibaAcDevice(
-                        self.loop,
                         device_info.ac_name,
                         self.device_id,
                         device_info.ac_id,
@@ -190,7 +188,7 @@ class ToshibaAcDeviceManager:
                     await self.fetch_energy_consumption()
 
                     if not self.periodic_fetch_energy_consumption_task:
-                        self.periodic_fetch_energy_consumption_task = self.loop.create_task(
+                        self.periodic_fetch_energy_consumption_task = asyncio.get_running_loop().create_task(
                             self.periodic_fetch_energy_consumption()
                         )
 
