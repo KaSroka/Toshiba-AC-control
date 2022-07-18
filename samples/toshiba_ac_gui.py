@@ -45,19 +45,18 @@ class DeviceTab:
 
 
 class App(tk.Tk):
-    def __init__(self, loop, user, password, refresh_interval=1 / 20):
+    def __init__(self, user, password, refresh_interval=1 / 20):
         super().__init__()
         self.user = user
         self.password = password
         self.title("Toshiba AC")
-        self.loop = loop
         self.protocol("WM_DELETE_WINDOW", self.close)
-        self.updater_task = self.loop.create_task(self.updater(refresh_interval))
+        self.updater_task = asyncio.get_event_loop().create_task(self.updater(refresh_interval))
         self.tab_control = ttk.Notebook()
         self.devices = {}
 
         # This is called before loop is started so we can use run_until_complete
-        self.loop.run_until_complete(asyncio.gather(self.init()))
+        asyncio.get_event_loop().run_until_complete(asyncio.gather(self.init()))
 
     def populate_device_tab_enum(self, dev_tab, var_name, enum, setter, row):
         string_var = tk.StringVar()
@@ -71,7 +70,7 @@ class App(tk.Tk):
             btn = ttk.Button(
                 dev_tab.tab,
                 text=option.title().replace("_", " "),
-                command=lambda opt=option: self.loop.create_task(setter(enum[opt])),
+                command=lambda opt=option: asyncio.get_running_loop().create_task(setter(enum[opt])),
             )
             btn.grid(column=i, row=row, padx=0, pady=0)
 
@@ -88,7 +87,10 @@ class App(tk.Tk):
         temp_sb = ttk.Spinbox(dev_tab.tab, textvariable=temp_req, from_=5, to=30, width=7)
         temp_sb.grid(column=1, row=2, padx=0, pady=0)
         temp_req.set(dev_tab.device.ac_temperature)
-        temp_req.trace_add("write", lambda *_: self.loop.create_task(dev_tab.device.set_ac_temperature(temp_req.get())))
+        temp_req.trace_add(
+            "write",
+            lambda *_: asyncio.get_running_loop().create_task(dev_tab.device.set_ac_temperature(temp_req.get())),
+        )
 
         self.populate_device_tab_enum(dev_tab, "ac_fan_mode", ToshibaAcFanMode, dev_tab.device.set_ac_fan_mode, 3)
         self.populate_device_tab_enum(dev_tab, "ac_swing_mode", ToshibaAcSwingMode, dev_tab.device.set_ac_swing_mode, 4)
@@ -150,7 +152,7 @@ class App(tk.Tk):
         self.update_ac_state(self.devices[dev])
 
     async def init(self):
-        self.device_manager = ToshibaAcDeviceManager(self.loop, self.user, self.password, "3e6e4eb5f0e5aa40")
+        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, "3e6e4eb5f0e5aa40")
         await self.device_manager.connect()
 
         devices = await self.device_manager.get_devices()
@@ -175,10 +177,10 @@ class App(tk.Tk):
 
     def close(self):
         self.updater_task.cancel()
-        self.loop.create_task(self.device_manager.shutdown()).add_done_callback(self.cleanup)
+        asyncio.get_running_loop().create_task(self.device_manager.shutdown()).add_done_callback(self.cleanup)
 
     def cleanup(self, _):
-        self.loop.stop()
+        asyncio.get_running_loop().stop()
 
 
 class EnvDefault(argparse.Action):
@@ -220,5 +222,5 @@ def parse_cred():
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    app = App(loop, *parse_cred())
+    app = App(*parse_cred())
     loop.run_forever()

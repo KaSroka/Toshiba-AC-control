@@ -78,7 +78,6 @@ class ToshibaAcDevice:
 
     def __init__(
         self,
-        loop: asyncio.AbstractEventLoop,
         name: str,
         device_id: str,
         ac_id: str,
@@ -90,7 +89,6 @@ class ToshibaAcDevice:
         amqp_api: ToshibaAcAmqpApi,
         http_api: ToshibaAcHttpApi,
     ) -> None:
-        self.loop = loop
         self.name = name
         self.device_id = device_id
         self.ac_id = ac_id
@@ -112,7 +110,7 @@ class ToshibaAcDevice:
 
     async def connect(self) -> None:
         await self.load_additional_device_info()
-        self.periodic_reload_state_task = self.loop.create_task(self.periodic_state_reload())
+        self.periodic_reload_state_task = asyncio.get_running_loop().create_task(self.periodic_state_reload())
 
     async def shutdown(self) -> None:
         self.periodic_reload_state_task.cancel()
