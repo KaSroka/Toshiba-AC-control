@@ -49,7 +49,7 @@ class ToshibaAcHttpApiAuthError(ToshibaAcHttpApiError):
 
 
 class ToshibaAcHttpApi:
-    BASE_URL = "https://toshibamobileservice.azurewebsites.net"
+    BASE_URL = "https://mobileapi.toshibahomeaccontrols.com"
     LOGIN_PATH = "/api/Consumer/Login"
     REGISTER_PATH = "/api/Consumer/RegisterMobileDevice"
     AC_MAPPING_PATH = "/api/AC/GetConsumerACMapping"

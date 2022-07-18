@@ -176,6 +176,7 @@ class ToshibaAcFcuState:
             return {
                 0x02: ToshibaAcMeritB.FIREPLACE_1,
                 0x03: ToshibaAcMeritB.FIREPLACE_2,
+                0x01: ToshibaAcMeritB.OFF,  # New value reported after update, nothing found in 3.4.0 APK version
                 0x00: ToshibaAcMeritB.OFF,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcMeritB.NONE,
                 ToshibaAcFcuState.NONE_VAL_HALF: ToshibaAcMeritB.NONE,
