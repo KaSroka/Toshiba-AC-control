@@ -1,3 +1,3 @@
 from . import _version
 
-__version__ = _version.get_versions()["version"]  # type: ignore
+__version__ = _version.get_versions()["version"]
