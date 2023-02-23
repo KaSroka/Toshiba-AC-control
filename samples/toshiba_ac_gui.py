@@ -197,7 +197,6 @@ class EnvDefault(argparse.Action):
 
 
 def parse_cred():
-
     parser = argparse.ArgumentParser(description="CLI for Toshiba AC")
     parser.add_argument(
         "--user",
