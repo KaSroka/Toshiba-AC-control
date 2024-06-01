@@ -306,7 +306,7 @@ class ToshibaAcFcuState:
 
     def decode(self, hex_state: str) -> None:
         extended_hex_state = (
-            hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:38] # Toshiba sometimes responds with more than 38 bytes (maybe some extra data, but we ignore it by stopping at the 38th byte)
+            hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:38] # Toshiba sometimes responds with more than 19 bytes (maybe some extra data, but we ignore it by stopping at the 38th hex value)
         )  # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
         data = self.ENCODING_STRUCT.unpack(bytes.fromhex(extended_hex_state))
         (
