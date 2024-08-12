@@ -78,6 +78,7 @@ class ToshibaAcHttpApi:
             headers = {}
             headers["Content-Type"] = "application/json"
             headers["Authorization"] = self.access_token_type + " " + self.access_token
+            headers["User-Agent"] = "curl/7.64.0"
 
         url = self.BASE_URL + path
 
