@@ -67,8 +67,8 @@ class ToshibaAcHttpApi:
     async def request_api(
         self,
         path: str,
-        get: t.Any = None,
-        post: t.Any = None,
+        get: dict[str, str] | None = None,
+        post: t.Mapping[str, str | t.Sequence[str]] | None = None,
         headers: t.Any = None,
     ) -> t.Any:
         if not isinstance(headers, dict):

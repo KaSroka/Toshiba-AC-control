@@ -34,7 +34,7 @@ from toshiba_ac.device.properties import (
     ToshibaAcSwingMode,
 )
 from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name
-from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi
+from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi, JSONSerializable
 from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
 logger = logging.getLogger(__name__)
@@ -142,12 +142,15 @@ class ToshibaAcDevice:
             except:
                 pass
 
-    async def handle_cmd_fcu_from_ac(self, payload: t.Any) -> None:
+    async def handle_cmd_fcu_from_ac(self, payload: dict[str, JSONSerializable]) -> None:
+        if not isinstance(payload["data"], str):
+            logger.error(f'[{self.name}] malformed AC state from AMQP: {payload["data"]}')
+            return
         logger.debug(f'[{self.name}] AC state from AMQP: {payload["data"]}')
         if self.fcu_state.update(payload["data"]):
             await self.state_changed()
 
-    async def handle_cmd_heartbeat(self, payload: t.Any) -> None:
+    async def handle_cmd_heartbeat(self, payload: dict[str, t.Any]) -> None:
         hb_data = {k: int(v, base=16) for k, v in payload.items()}
         logger.debug(f"[{self.name}] AC heartbeat from AMQP: {hb_data}")
 

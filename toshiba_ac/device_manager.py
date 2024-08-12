@@ -18,7 +18,7 @@ import typing as t
 
 from toshiba_ac.device import ToshibaAcDevice
 from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
-from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi
+from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi, JSONSerializable
 from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
 logger = logging.getLogger(__name__)
@@ -195,11 +195,21 @@ class ToshibaAcDeviceManager:
             return list(self.devices.values())
 
     def handle_cmd_fcu_from_ac(
-        self, source_id: str, message_id: str, target_id: str, payload: t.Any, timestamp: str
+        self,
+        source_id: str,
+        message_id: str,
+        target_id: list[JSONSerializable],
+        payload: dict[str, JSONSerializable],
+        timestamp: str,
     ) -> None:
         asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_fcu_from_ac(payload), self.loop).result()
 
     def handle_cmd_heartbeat(
-        self, source_id: str, message_id: str, target_id: str, payload: t.Any, timestamp: str
+        self,
+        source_id: str,
+        message_id: str,
+        target_id: list[JSONSerializable],
+        payload: dict[str, JSONSerializable],
+        timestamp: str,
     ) -> None:
         asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_heartbeat(payload), self.loop).result()
