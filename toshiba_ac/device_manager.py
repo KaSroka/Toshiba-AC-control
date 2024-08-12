@@ -113,7 +113,8 @@ class ToshibaAcDeviceManager:
                 await self.fetch_energy_consumption()
             except asyncio.CancelledError:
                 raise
-            except:
+            except Exception as e:
+                logger.error(f"Fetching energy consumption failed: {e}")
                 pass
 
     async def fetch_energy_consumption(self) -> None:

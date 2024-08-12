@@ -369,6 +369,19 @@ class ToshibaAcFcuState:
 
         return changed
 
+    def update_from_hbt(self, hb_data: t.Any) -> bool:
+        changed = False
+
+        if "iTemp" in hb_data and hb_data["iTemp"] != self._ac_indoor_temperature:
+            self._ac_indoor_temperature = hb_data["iTemp"]
+            changed = True
+
+        if "oTemp" in hb_data and hb_data["oTemp"] != self._ac_outdoor_temperature:
+            self._ac_outdoor_temperature = hb_data["oTemp"]
+            changed = True
+
+        return changed
+
     @property
     def ac_status(self) -> ToshibaAcStatus:
         return ToshibaAcFcuState.AcStatus.from_raw(self._ac_status)

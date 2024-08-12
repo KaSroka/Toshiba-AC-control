@@ -139,7 +139,8 @@ class ToshibaAcDevice:
                 await self.state_reload()
             except asyncio.CancelledError:
                 raise
-            except:
+            except Exception as e:
+                logger.error(f"State reload failed: {e}")
                 pass
 
     async def handle_cmd_fcu_from_ac(self, payload: dict[str, JSONSerializable]) -> None:
@@ -153,6 +154,9 @@ class ToshibaAcDevice:
     async def handle_cmd_heartbeat(self, payload: dict[str, t.Any]) -> None:
         hb_data = {k: int(v, base=16) for k, v in payload.items()}
         logger.debug(f"[{self.name}] AC heartbeat from AMQP: {hb_data}")
+
+        if self.fcu_state.update_from_hbt(hb_data):
+            await self.state_changed()
 
     async def handle_update_ac_energy_consumption(self, val: ToshibaAcDeviceEnergyConsumption) -> None:
         if self._ac_energy_consumption != val:

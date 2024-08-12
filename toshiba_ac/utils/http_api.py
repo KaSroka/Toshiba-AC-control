@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import aiohttp
 from toshiba_ac.device.properties import ToshibaAcDeviceEnergyConsumption
+from toshiba_ac.utils import retry_with_timeout, retry_on_exception
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,8 @@ class ToshibaAcHttpApi:
         self.consumer_id: t.Optional[str] = None
         self.session: t.Optional[aiohttp.ClientSession] = None
 
+    @retry_with_timeout(timeout=5, retries=3, backoff=10)
+    @retry_on_exception(exceptions=ToshibaAcHttpApiError, retries=3, backoff=10)
     async def request_api(
         self,
         path: str,
@@ -95,19 +98,20 @@ class ToshibaAcHttpApi:
             method = self.session.get
 
         async with method(url, **method_args) as response:
-            json = await response.json()
             logger.debug(f"Response code: {response.status}")
 
-            err_type = ToshibaAcHttpApiError
-
             if response.status == 200:
+                json = await response.json()
+
                 if json["IsSuccess"]:
                     return json["ResObj"]
                 else:
                     if json["StatusCode"] == "InvalidUserNameorPassword":
-                        err_type = ToshibaAcHttpApiAuthError
+                        err_type = ToshibaAcHttpApiAuthError(json["Message"])
 
-            raise err_type(json["Message"])
+                    raise ToshibaAcHttpApiError(json["Message"])
+
+            raise ToshibaAcHttpApiError(await response.text())
 
     async def connect(self) -> None:
         headers = {"Content-Type": "application/json"}
