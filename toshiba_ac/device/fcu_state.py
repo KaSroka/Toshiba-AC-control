@@ -306,8 +306,9 @@ class ToshibaAcFcuState:
 
     def decode(self, hex_state: str) -> None:
         extended_hex_state = (
-            hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:]
-        )  # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes
+            hex_state[:12] + "0" + hex_state[12] + "0" + hex_state[13:38]
+        )  # Merit A/B features are encoded using half bytes but our unpacking expect them as bytes.
+        # We also ignore any extra bytes if present.
         data = self.ENCODING_STRUCT.unpack(bytes.fromhex(extended_hex_state))
         (
             self._ac_status,
