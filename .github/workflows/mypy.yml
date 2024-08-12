@@ -23,7 +23,7 @@ jobs:
         ls -alh
         pwd
         pip install --user wheel
-        pip install --user mypy==0.910
+        pip install --user mypy==1.11.1
         pip install --user -e .
     - name: Check types
       run: mypy .
