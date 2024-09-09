@@ -100,3 +100,36 @@ def retry_on_exception(
         return wrapper
 
     return decorator
+
+
+T = t.TypeVar("T")  # Generic type variable for devices
+
+
+class ToshibaAcCallback(t.Generic[T]):
+    def __init__(self) -> None:
+        self.callbacks: t.List[t.Callable[[T], t.Optional[t.Awaitable[None]]]] = []
+
+    def add(self, callback: t.Callable[[T], t.Optional[t.Awaitable[None]]]) -> bool:
+        if callback not in self.callbacks:
+            self.callbacks.append(callback)
+            return True
+
+        return False
+
+    def remove(self, callback: t.Callable[[T], t.Optional[t.Awaitable[None]]]) -> bool:
+        if callback in self.callbacks:
+            self.callbacks.remove(callback)
+            return True
+
+        return False
+
+    async def __call__(self, device: T) -> None:
+        asyncs = []
+
+        for callback in self.callbacks:
+            if asyncio.iscoroutinefunction(callback):
+                asyncs.append(t.cast(t.Awaitable[None], callback(device)))
+            else:
+                callback(device)
+
+        await asyncio.gather(*asyncs)

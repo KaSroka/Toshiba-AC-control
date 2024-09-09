@@ -17,7 +17,7 @@ import logging
 import typing as t
 
 from toshiba_ac.device import ToshibaAcDevice
-from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes
+from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, ToshibaAcCallback
 from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi, JSONSerializable
 from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 class ToshibaAcDeviceManagerError(Exception):
+    pass
+
+
+class ToshibaAcSasTokenUpdatedCallback(ToshibaAcCallback[str]):
     pass
 
 
@@ -49,6 +53,7 @@ class ToshibaAcDeviceManager:
         self.periodic_fetch_energy_consumption_task: t.Optional[asyncio.Task[None]] = None
         self.lock = asyncio.Lock()
         self.loop = asyncio.get_running_loop()
+        self._on_sas_token_updated_callback = ToshibaAcSasTokenUpdatedCallback()
 
     async def connect(self) -> str:
         try:
@@ -61,7 +66,7 @@ class ToshibaAcDeviceManager:
                     self.sas_token = await self.http_api.register_client(self.device_id)
 
                 if not self.amqp_api:
-                    self.amqp_api = ToshibaAcAmqpApi(self.sas_token)
+                    self.amqp_api = ToshibaAcAmqpApi(self.sas_token, self.renew_sas_token)
                     self.amqp_api.register_command_handler("CMD_FCU_FROM_AC", self.handle_cmd_fcu_from_ac)
                     self.amqp_api.register_command_handler("CMD_HEARTBEAT", self.handle_cmd_heartbeat)
                     await self.amqp_api.connect()
@@ -195,6 +200,14 @@ class ToshibaAcDeviceManager:
 
             return list(self.devices.values())
 
+    async def renew_sas_token(self) -> str:
+        if self.http_api:
+            self.sas_token = await self.http_api.register_client(self.device_id)
+            await self.on_sas_token_updated_callback(self.sas_token)
+            return self.sas_token
+
+        raise ToshibaAcDeviceManagerError("Not connected")
+
     def handle_cmd_fcu_from_ac(
         self,
         source_id: str,
@@ -214,3 +227,7 @@ class ToshibaAcDeviceManager:
         timestamp: str,
     ) -> None:
         asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_heartbeat(payload), self.loop).result()
+
+    @property
+    def on_sas_token_updated_callback(self) -> ToshibaAcSasTokenUpdatedCallback:
+        return self._on_sas_token_updated_callback
