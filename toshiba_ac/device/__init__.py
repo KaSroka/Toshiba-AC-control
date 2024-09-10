@@ -33,7 +33,7 @@ from toshiba_ac.device.properties import (
     ToshibaAcStatus,
     ToshibaAcSwingMode,
 )
-from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name
+from toshiba_ac.utils import async_sleep_until_next_multiply_of_minutes, pretty_enum_name, ToshibaAcCallback
 from toshiba_ac.utils.amqp_api import ToshibaAcAmqpApi, JSONSerializable
 from toshiba_ac.utils.http_api import ToshibaAcHttpApi
 
@@ -44,33 +44,8 @@ class ToshibaAcDeviceError(Exception):
     pass
 
 
-class ToshibaAcDeviceCallback:
-    def __init__(self) -> None:
-        self.callbacks: t.List[t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]] = []
-
-    def add(self, callback: t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]) -> bool:
-        if callback not in self.callbacks:
-            self.callbacks.append(callback)
-            return True
-
-        return False
-
-    def remove(self, callback: t.Callable[[ToshibaAcDevice], t.Optional[t.Awaitable[None]]]) -> bool:
-        if callback in self.callbacks:
-            self.callbacks.remove(callback)
-            return True
-
-        return False
-
-    async def __call__(self, dev: ToshibaAcDevice) -> None:
-        for callback in self.callbacks:
-            asyncs = []
-            if asyncio.iscoroutinefunction(callback):
-                asyncs.append(t.cast(t.Awaitable[None], callback(dev)))
-            else:
-                callback(dev)
-
-            await asyncio.gather(*asyncs)
+class ToshibaAcDeviceCallback(ToshibaAcCallback["ToshibaAcDevice"]):
+    pass
 
 
 class ToshibaAcDevice:
@@ -105,6 +80,7 @@ class ToshibaAcDevice:
         self._on_state_changed_callback = ToshibaAcDeviceCallback()
         self._on_energy_consumption_changed_callback = ToshibaAcDeviceCallback()
         self._ac_energy_consumption: t.Optional[ToshibaAcDeviceEnergyConsumption] = None
+        self.periodic_reload_state_task: t.Optional[asyncio.Task[None]] = None
 
         logger.debug(f"[{self.name}] {self.supported}")
 
@@ -113,8 +89,9 @@ class ToshibaAcDevice:
         self.periodic_reload_state_task = asyncio.get_running_loop().create_task(self.periodic_state_reload())
 
     async def shutdown(self) -> None:
-        self.periodic_reload_state_task.cancel()
-        await self.periodic_reload_state_task
+        if self.periodic_reload_state_task:
+            self.periodic_reload_state_task.cancel()
+            await self.periodic_reload_state_task
 
     async def load_additional_device_info(self) -> None:
         additional_info = await self.http_api.get_device_additional_info(self.ac_id)

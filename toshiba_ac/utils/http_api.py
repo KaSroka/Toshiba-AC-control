@@ -65,8 +65,8 @@ class ToshibaAcHttpApi:
         self.consumer_id: t.Optional[str] = None
         self.session: t.Optional[aiohttp.ClientSession] = None
 
-    @retry_with_timeout(timeout=5, retries=3, backoff=10)
-    @retry_on_exception(exceptions=ToshibaAcHttpApiError, retries=3, backoff=10)
+    @retry_with_timeout(timeout=5, retries=3, backoff=60)
+    @retry_on_exception(exceptions=ToshibaAcHttpApiError, retries=3, backoff=60)
     async def request_api(
         self,
         path: str,
@@ -107,7 +107,7 @@ class ToshibaAcHttpApi:
                     return json["ResObj"]
                 else:
                     if json["StatusCode"] == "InvalidUserNameorPassword":
-                        err_type = ToshibaAcHttpApiAuthError(json["Message"])
+                        raise ToshibaAcHttpApiAuthError(json["Message"])
 
                     raise ToshibaAcHttpApiError(json["Message"])
 

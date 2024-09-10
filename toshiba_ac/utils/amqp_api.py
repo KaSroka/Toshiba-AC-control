@@ -28,12 +28,14 @@ class ToshibaAcAmqpApi:
     COMMANDS = ["CMD_FCU_FROM_AC", "CMD_HEARTBEAT"]
     _HANDLER_TYPE = t.Callable[[str, str, list[JSONSerializable], dict[str, JSONSerializable], str], None]
 
-    def __init__(self, sas_token: str) -> None:
+    def __init__(self, sas_token: str, new_sas_token_required_callback: t.Callable[[], t.Awaitable[str]]) -> None:
         self.sas_token = sas_token
         self.handlers: t.Dict[str, ToshibaAcAmqpApi._HANDLER_TYPE] = {}
 
         self.device = IoTHubDeviceClient.create_from_sastoken(self.sas_token)
         self.device.on_method_request_received = self.method_request_received
+        self.device.on_new_sastoken_required = self.new_sas_token_required  # type: ignore
+        self.on_new_sastoken_required_callback = new_sas_token_required_callback
 
     async def connect(self) -> None:
         await self.device.connect()
@@ -45,6 +47,11 @@ class ToshibaAcAmqpApi:
         if command not in self.COMMANDS:
             raise AttributeError(f'Unknown command: {command}, should be one of {" ".join(self.COMMANDS)}')
         self.handlers[command] = handler
+
+    async def new_sas_token_required(self) -> None:
+        logger.info(f"SAS token is about to expire")
+        new_token = await self.on_new_sastoken_required_callback()
+        await self.device.update_sastoken(new_token)
 
     async def method_request_received(self, method_data: MethodRequest) -> None:
         if method_data.name != "smmobile":
