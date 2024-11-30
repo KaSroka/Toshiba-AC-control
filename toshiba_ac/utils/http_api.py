@@ -81,6 +81,7 @@ class ToshibaAcHttpApi:
             headers = {}
             headers["Content-Type"] = "application/json"
             headers["Authorization"] = self.access_token_type + " " + self.access_token
+            headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
         url = self.BASE_URL + path
 
@@ -114,7 +115,10 @@ class ToshibaAcHttpApi:
             raise ToshibaAcHttpApiError(await response.text())
 
     async def connect(self) -> None:
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+        }
         post = {"Username": self.username, "Password": self.password}
 
         res = await self.request_api(self.LOGIN_PATH, post=post, headers=headers)
