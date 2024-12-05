@@ -130,7 +130,8 @@ class ToshibaAcDevice:
             await self.state_changed()
 
     async def handle_cmd_heartbeat(self, payload: dict[str, t.Any]) -> None:
-        hb_data = {k: struct.unpack("b", bytearray.fromhex(v))[0] for k, v in payload.items()}
+        # Use signed conversion for temperatures, unsigned otherwise.
+        hb_data = {k: struct.unpack("b" if "Temp" in k else "B", bytes.fromhex(v))[0] for k, v in payload.items()}
         logger.debug(f"[{self.name}] AC heartbeat from AMQP: {hb_data}")
 
         if self.fcu_state.update_from_hbt(hb_data):
