@@ -241,19 +241,21 @@ class ToshibaAcDevice:
             # Try token refresh on any error - it might resolve the issue
             logger.warning(f"[{self.name}] Send message failed: {e}")
             logger.info(f"[{self.name}] Attempting to refresh SAS token and retry...")
-            
+
             try:
                 # Trigger token renewal via the existing callback mechanism
                 await self.amqp_api.on_new_sastoken_required_callback()
                 logger.info(f"[{self.name}] SAS token refreshed successfully, retrying send...")
-                
+
                 # Retry the operation once with the new token
                 await self.amqp_api.send_message(str(fcu_to_ac))
                 logger.info(f"[{self.name}] Command sent successfully after token refresh")
-                
+
             except Exception as retry_error:
                 logger.error(f"[{self.name}] Failed to send command even after token refresh: {retry_error}")
-                raise ToshibaAcDeviceError(f"Failed to send command after token refresh: {retry_error}") from retry_error
+                raise ToshibaAcDeviceError(
+                    f"Failed to send command after token refresh: {retry_error}"
+                ) from retry_error
 
     @property
     def ac_status(self) -> ToshibaAcStatus:
