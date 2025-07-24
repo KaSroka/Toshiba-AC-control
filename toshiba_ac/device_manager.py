@@ -203,19 +203,19 @@ class ToshibaAcDeviceManager:
     async def renew_sas_token(self) -> str:
         if self.http_api:
             logger.info("Renewing SAS token and recreating AMQP connection...")
-            
+
             try:
                 # Get fresh token from HTTP API
                 self.sas_token = await self.http_api.register_client(self.device_id)
                 logger.info("Successfully obtained fresh SAS token")
-                
+
                 # Shutdown existing AMQP connection completely
                 if self.amqp_api:
                     logger.info("Shutting down existing AMQP connection...")
                     await self.amqp_api.shutdown()
                     self.amqp_api = None
                     logger.info("AMQP connection shutdown complete")
-                
+
                 # Create completely fresh AMQP connection with new token
                 logger.info("Creating fresh AMQP connection with new token...")
                 self.amqp_api = ToshibaAcAmqpApi(self.sas_token, self.renew_sas_token)
@@ -223,18 +223,18 @@ class ToshibaAcDeviceManager:
                 self.amqp_api.register_command_handler("CMD_HEARTBEAT", self.handle_cmd_heartbeat)
                 await self.amqp_api.connect()
                 logger.info("Fresh AMQP connection established successfully")
-                
+
                 # Update all devices with the new AMQP API reference
                 for device in self.devices.values():
                     device.amqp_api = self.amqp_api
                     logger.debug(f"Updated device {device.name} with fresh AMQP connection")
-                
+
                 # Notify Home Assistant integration of token update
                 await self.on_sas_token_updated_callback(self.sas_token)
                 logger.info("SAS token renewal and AMQP reconnection completed successfully")
-                
+
                 return self.sas_token
-                
+
             except Exception as e:
                 logger.error(f"Failed to renew SAS token and recreate AMQP connection: {e}")
                 # If we failed, make sure we don't have a partially broken state
