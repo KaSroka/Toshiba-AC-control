@@ -113,7 +113,6 @@ class ToshibaAcDeviceManager:
 
     async def periodic_fetch_energy_consumption(self) -> None:
         while True:
-            await async_sleep_until_next_multiply_of_minutes(self.FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES)
             try:
                 await self.fetch_energy_consumption()
             except asyncio.CancelledError:
@@ -121,6 +120,8 @@ class ToshibaAcDeviceManager:
             except Exception as e:
                 logger.error(f"Fetching energy consumption failed: {e}")
                 pass
+
+            await async_sleep_until_next_multiply_of_minutes(self.FETCH_ENERGY_CONSUMPTION_PERIOD_MINUTES)
 
     async def fetch_energy_consumption(self) -> None:
         if not self.http_api:
@@ -191,10 +192,8 @@ class ToshibaAcDeviceManager:
                 await asyncio.gather(*connects)
 
                 if any(device.supported.ac_energy_report for device in self.devices.values()):
-                    await self.fetch_energy_consumption()
-
                     if not self.periodic_fetch_energy_consumption_task:
-                        self.periodic_fetch_energy_consumption_task = asyncio.get_running_loop().create_task(
+                        self.periodic_fetch_energy_consumption_task = asyncio.create_task(
                             self.periodic_fetch_energy_consumption()
                         )
 
@@ -208,6 +207,22 @@ class ToshibaAcDeviceManager:
 
         raise ToshibaAcDeviceManagerError("Not connected")
 
+    def _schedule_device_handler(
+        self,
+        source_id: str,
+        command_name: str,
+        handler_coroutine: t.Coroutine[t.Any, t.Any, None],
+    ) -> None:
+        future = asyncio.run_coroutine_threadsafe(handler_coroutine, self.loop)
+
+        def _on_done(f: t.Any) -> None:
+            try:
+                f.result()
+            except Exception as e:
+                logger.error(f"Failed to process {command_name} for device {source_id}: {e}", exc_info=True)
+
+        future.add_done_callback(_on_done)
+
     def handle_cmd_fcu_from_ac(
         self,
         source_id: str,
@@ -216,7 +231,13 @@ class ToshibaAcDeviceManager:
         payload: dict[str, JSONSerializable],
         timestamp: str,
     ) -> None:
-        asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_fcu_from_ac(payload), self.loop).result()
+        device = self.devices.get(source_id)
+
+        if not device:
+            logger.warning(f"Ignoring CMD_FCU_FROM_AC for unknown source_id {source_id}")
+            return
+
+        self._schedule_device_handler(source_id, "CMD_FCU_FROM_AC", device.handle_cmd_fcu_from_ac(payload))
 
     def handle_cmd_heartbeat(
         self,
@@ -226,7 +247,13 @@ class ToshibaAcDeviceManager:
         payload: dict[str, JSONSerializable],
         timestamp: str,
     ) -> None:
-        asyncio.run_coroutine_threadsafe(self.devices[source_id].handle_cmd_heartbeat(payload), self.loop).result()
+        device = self.devices.get(source_id)
+
+        if not device:
+            logger.warning(f"Ignoring CMD_HEARTBEAT for unknown source_id {source_id}")
+            return
+
+        self._schedule_device_handler(source_id, "CMD_HEARTBEAT", device.handle_cmd_heartbeat(payload))
 
     @property
     def on_sas_token_updated_callback(self) -> ToshibaAcSasTokenUpdatedCallback:

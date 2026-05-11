@@ -14,11 +14,11 @@
 
 import asyncio
 import datetime
-import random
 import functools
 import logging
-from enum import Enum
+import random
 import typing as t
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +51,39 @@ R = t.TypeVar("R")
 P = t.ParamSpec("P")
 
 
+class RetryJitterMode(str, Enum):
+    # Full jitter: pick a delay uniformly from [0, cap].
+    # Best at spreading retries broadly across many clients.
+    FULL = "full"
+    # Equal jitter: pick a delay uniformly from [cap/2, cap].
+    # Avoids very short retries while preserving randomness.
+    EQUAL = "equal"
+
+
+def _compute_exponential_backoff_delay(
+    *,
+    backoff: float,
+    attempt: int,
+    max_backoff: float,
+    growth_factor: float = 2.0,
+    jitter_mode: RetryJitterMode = RetryJitterMode.FULL,
+) -> float:
+    capped_backoff = min(max_backoff, backoff * (growth_factor ** (attempt - 1)))
+
+    if jitter_mode == RetryJitterMode.EQUAL:
+        return random.uniform(capped_backoff / 2, capped_backoff)
+
+    return random.uniform(0, capped_backoff)
+
+
 def retry_with_timeout(
-    *, timeout: float, retries: int, backoff: float
+    *,
+    timeout: float,
+    retries: int,
+    backoff: float,
+    max_backoff: float = 300,
+    growth_factor: float = 2.0,
+    jitter_mode: RetryJitterMode = RetryJitterMode.FULL,
 ) -> t.Callable[[t.Callable[P, t.Awaitable[R]]], t.Callable[P, t.Awaitable[R]]]:
     def decorator(func: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
         @functools.wraps(func)
@@ -65,7 +96,13 @@ def retry_with_timeout(
                     attempt += 1
                     if attempt < retries + 1:
                         logger.info("Timeout exception. Will retry after backoff.")
-                        bk = random.uniform(0.1 * backoff * attempt, backoff * attempt)
+                        bk = _compute_exponential_backoff_delay(
+                            backoff=backoff,
+                            attempt=attempt,
+                            max_backoff=max_backoff,
+                            growth_factor=growth_factor,
+                            jitter_mode=jitter_mode,
+                        )
                         await asyncio.sleep(bk)
                     else:
                         raise
@@ -79,7 +116,11 @@ def retry_on_exception(
     *,
     retries: int,
     backoff: float,
+    max_backoff: float = 300,
+    growth_factor: float = 2.0,
+    jitter_mode: RetryJitterMode = RetryJitterMode.FULL,
     exceptions: t.Type[BaseException] | t.Tuple[t.Type[BaseException], ...],
+    should_retry: t.Optional[t.Callable[[BaseException], bool]] = None,
 ) -> t.Callable[[t.Callable[P, t.Awaitable[R]]], t.Callable[P, t.Awaitable[R]]]:
     def decorator(func: t.Callable[P, t.Awaitable[R]]) -> t.Callable[P, t.Awaitable[R]]:
         @functools.wraps(func)
@@ -89,13 +130,28 @@ def retry_on_exception(
                 try:
                     return await func(*args, **kwargs)
                 except exceptions as e:
+                    if should_retry is not None and not should_retry(e):
+                        raise
+
                     attempt += 1
                     if attempt < retries + 1:
-                        logger.info("Known exception occurred. Will retry after backoff.")
-                        bk = random.uniform(0.1 * backoff * attempt, backoff * attempt)
+                        bk = _compute_exponential_backoff_delay(
+                            backoff=backoff,
+                            attempt=attempt,
+                            max_backoff=max_backoff,
+                            growth_factor=growth_factor,
+                            jitter_mode=jitter_mode,
+                        )
+                        error_preview = str(e)
+                        if len(error_preview) > 200:
+                            error_preview = error_preview[:197] + "..."
+                        logger.info(
+                            f"Known exception occurred ({type(e).__name__}: {error_preview}). "
+                            f"Retry {attempt}/{retries} after backoff {bk:.2f}s."
+                        )
                         await asyncio.sleep(bk)
                     else:
-                        raise e  # Re-raise the exception if all retries are exhausted
+                        raise
 
         return wrapper
 

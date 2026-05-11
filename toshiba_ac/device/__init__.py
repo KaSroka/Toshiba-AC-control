@@ -82,17 +82,30 @@ class ToshibaAcDevice:
         self._on_energy_consumption_changed_callback = ToshibaAcDeviceCallback()
         self._ac_energy_consumption: t.Optional[ToshibaAcDeviceEnergyConsumption] = None
         self.periodic_reload_state_task: t.Optional[asyncio.Task[None]] = None
+        self.load_additional_device_info_task: t.Optional[asyncio.Task[None]] = None
 
         logger.debug(f"[{self.name}] {self.supported}")
 
     async def connect(self) -> None:
-        await self.load_additional_device_info()
-        self.periodic_reload_state_task = asyncio.get_running_loop().create_task(self.periodic_state_reload())
+        self.load_additional_device_info_task = asyncio.create_task(self._load_additional_device_info_deferred())
+        self.periodic_reload_state_task = asyncio.create_task(self.periodic_state_reload())
 
     async def shutdown(self) -> None:
+        if self.load_additional_device_info_task:
+            self.load_additional_device_info_task.cancel()
+            await self.load_additional_device_info_task
+
         if self.periodic_reload_state_task:
             self.periodic_reload_state_task.cancel()
             await self.periodic_reload_state_task
+
+    async def _load_additional_device_info_deferred(self) -> None:
+        try:
+            await self.load_additional_device_info()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(f"[{self.name}] Failed to load additional device info: {e}")
 
     async def load_additional_device_info(self) -> None:
         additional_info = await self.http_api.get_device_additional_info(self.ac_id)

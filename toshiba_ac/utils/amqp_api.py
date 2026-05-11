@@ -53,51 +53,67 @@ class ToshibaAcAmqpApi:
         new_token = await self.on_new_sastoken_required_callback()
         await self.device.update_sastoken(new_token)
 
+    async def _ack_method_request(self, method_data: MethodRequest) -> None:
+        try:
+            await self.device.send_method_response(MethodResponse.create_from_method_request(method_data, 0))
+        except Exception:
+            logger.exception(f"Failed to send method response for {method_data.name}")
+
     async def method_request_received(self, method_data: MethodRequest) -> None:
-        if method_data.name != "smmobile":
-            return logger.info(f"Unknown method name: {method_data.name} full data: {method_data.payload}")
+        try:
+            if method_data.name != "smmobile":
+                logger.info(f"Unknown method name: {method_data.name} full data: {method_data.payload}")
+                return
 
-        if not isinstance(method_data.payload, dict):
-            # Currently supported payloads are dicts
-            return
-        data = method_data.payload
-        command = data["cmd"]
-        if not isinstance(command, str):
-            return
-        handler = self.handlers.get(command, None)
+            if not isinstance(method_data.payload, dict):
+                logger.info(f"Unsupported payload type for method {method_data.name}: {type(method_data.payload)}")
+                return
 
-        if handler:
-            source_id = data["sourceId"]
-            message_id = data["messageId"]
-            target_id = data["targetId"]
-            payload = data["payload"]
-            time_stamp = data["timeStamp"]
+            data = method_data.payload
+            command = data.get("cmd")
+            payload = data.get("payload")
+
+            if not isinstance(command, str):
+                logger.error(f"Malformed command in payload: {payload}")
+                return
+
+            handler = self.handlers.get(command)
+
+            if not handler:
+                logger.info(f"Unhandled command {command} with payload: {payload}")
+                return
+
+            source_id = data.get("sourceId")
+            message_id = data.get("messageId")
+            target_id = data.get("targetId")
+            time_stamp = data.get("timeStamp")
 
             if not isinstance(source_id, str):
-                logger.error(f'Malformed sourceId in command {command} with payload: {data["payload"]}')
+                logger.error(f"Malformed sourceId in command {command} with payload: {payload}")
                 return
 
             if not isinstance(message_id, str):
-                logger.error(f'Malformed messageId in command {command} with payload: {data["payload"]}')
+                logger.error(f"Malformed messageId in command {command} with payload: {payload}")
                 return
 
             if not isinstance(target_id, list):
-                logger.error(f'Malformed targetId in command {command} with payload: {data["payload"]}')
+                logger.error(f"Malformed targetId in command {command} with payload: {payload}")
                 return
 
             if not isinstance(payload, dict):
-                logger.error(f'Malformed payload in command {command} with payload: {data["payload"]}')
+                logger.error(f"Malformed payload in command {command} with payload: {payload}")
                 return
 
             if not isinstance(time_stamp, str):
-                logger.error(f'Malformed timeStamp in command {command} with payload: {data["payload"]}')
+                logger.error(f"Malformed timeStamp in command {command} with payload: {payload}")
                 return
 
-            handler(source_id, message_id, target_id, payload, time_stamp)
-
-            await self.device.send_method_response(MethodResponse.create_from_method_request(method_data, 0))
-        else:
-            logger.info(f'Unhandled command {command} with payload: {data["payload"]}')
+            try:
+                handler(source_id, message_id, target_id, payload, time_stamp)
+            except Exception:
+                logger.exception(f"Command handler failed for {command} with payload: {payload}")
+        finally:
+            await self._ack_method_request(method_data)
 
     async def send_message(self, message: str) -> None:
         msg = Message(str(message))  # type: ignore

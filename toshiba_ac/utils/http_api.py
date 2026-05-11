@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import datetime
+import asyncio
 import logging
+import random
 import typing as t
 from dataclasses import dataclass
 
 import aiohttp
 from toshiba_ac.device.properties import ToshibaAcDeviceEnergyConsumption
-from toshiba_ac.utils import retry_with_timeout, retry_on_exception
+from toshiba_ac.utils import RetryJitterMode, retry_on_exception
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +51,18 @@ class ToshibaAcHttpApiAuthError(ToshibaAcHttpApiError):
     pass
 
 
+class ToshibaAcHttpApiRateLimitError(ToshibaAcHttpApiError):
+    pass
+
+
 class ToshibaAcHttpApi:
+    REQUEST_MIN_INTERVAL_S = 0.15
+    REQUEST_JITTER_S = 0.25
     BASE_URL = "https://mobileapi.toshibahomeaccontrols.com"
+    USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
     LOGIN_PATH = "/api/Consumer/Login"
     REGISTER_PATH = "/api/Consumer/RegisterMobileDevice"
     AC_MAPPING_PATH = "/api/AC/GetConsumerACMapping"
@@ -64,31 +76,86 @@ class ToshibaAcHttpApi:
         self.access_token_type: t.Optional[str] = None
         self.consumer_id: t.Optional[str] = None
         self.session: t.Optional[aiohttp.ClientSession] = None
+        self._session_lock = asyncio.Lock()
+        self._auth_lock = asyncio.Lock()
+        self._auth_generation = 0
+        self._request_pacing_lock = asyncio.Lock()
+        self._next_request_not_before = 0.0
 
-    @retry_with_timeout(timeout=5, retries=3, backoff=60)
-    @retry_on_exception(exceptions=ToshibaAcHttpApiError, retries=3, backoff=60)
+    async def _pace_requests(self) -> None:
+        async with self._request_pacing_lock:
+            loop = asyncio.get_running_loop()
+            now = loop.time()
+
+            wait_for = max(0.0, self._next_request_not_before - now)
+            if wait_for > 0:
+                await asyncio.sleep(wait_for)
+
+            self._next_request_not_before = (
+                loop.time() + self.REQUEST_MIN_INTERVAL_S + random.uniform(0.0, self.REQUEST_JITTER_S)
+            )
+
+    async def _ensure_session(self) -> None:
+        async with self._session_lock:
+            if not self.session or self.session.closed:
+                timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
+                self.session = aiohttp.ClientSession(timeout=timeout)
+
+    async def _refresh_auth_if_stale(self, failed_auth_generation: int) -> None:
+        async with self._auth_lock:
+            if self._auth_generation != failed_auth_generation:
+                return
+
+            await self.connect()
+
+    @retry_on_exception(
+        exceptions=ToshibaAcHttpApiRateLimitError,
+        retries=5,
+        backoff=10,
+        max_backoff=600,
+        growth_factor=3,
+        jitter_mode=RetryJitterMode.EQUAL,
+    )
+    @retry_on_exception(
+        exceptions=(ToshibaAcHttpApiError, aiohttp.ClientError, asyncio.TimeoutError),
+        retries=2,
+        backoff=5,
+        max_backoff=30,
+        should_retry=lambda e: not isinstance(
+            e,
+            (ToshibaAcHttpApiAuthError, ToshibaAcHttpApiRateLimitError),
+        ),
+    )
     async def request_api(
         self,
         path: str,
         get: dict[str, str] | None = None,
         post: t.Mapping[str, str | t.Sequence[str]] | None = None,
         headers: t.Any = None,
+        reauth_on_auth_error: bool = True,
     ) -> t.Any:
+        auth_generation = self._auth_generation
+        is_authenticated_request = False
+
         if not isinstance(headers, dict):
             if not self.access_token_type or not self.access_token:
                 raise ToshibaAcHttpApiError("Failed to send request, missing access token")
 
-            headers = {}
-            headers["Content-Type"] = "application/json"
-            headers["Authorization"] = self.access_token_type + " " + self.access_token
-            headers["User-Agent"] = (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-            )
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": self.access_token_type + " " + self.access_token,
+                "User-Agent": self.USER_AGENT,
+            }
+            is_authenticated_request = True
 
         url = self.BASE_URL + path
 
+        await self._ensure_session()
+
         if not self.session:
-            self.session = aiohttp.ClientSession()
+            raise ToshibaAcHttpApiError("Failed to initialize HTTP session")
+
+        await self._pace_requests()
 
         method_args = {"params": get, "headers": headers}
 
@@ -104,7 +171,10 @@ class ToshibaAcHttpApi:
             logger.debug(f"Response code: {response.status}")
 
             if response.status == 200:
-                json = await response.json()
+                try:
+                    json = await response.json()
+                except (aiohttp.ContentTypeError, ValueError) as e:
+                    raise ToshibaAcHttpApiError(f"Malformed JSON response for {path}: {e}") from e
 
                 if json["IsSuccess"]:
                     return json["ResObj"]
@@ -114,12 +184,39 @@ class ToshibaAcHttpApi:
 
                     raise ToshibaAcHttpApiError(json["Message"])
 
-            raise ToshibaAcHttpApiError(await response.text())
+            response_text = await response.text()
+            logger.warning(
+                "Non-200 response from Toshiba API "
+                f"(status={response.status}, path={path}, content_type={response.headers.get('Content-Type')}, "
+                f"server={response.headers.get('Server')})"
+            )
+            logger.debug(f"Non-200 response body for {path} (first 500 chars): {response_text[:500]}")
+
+            if is_authenticated_request and response.status == 401:
+                if reauth_on_auth_error:
+                    logger.warning(
+                        f"Auth failed for endpoint {path} with status 401. " f"Refreshing auth and retrying once."
+                    )
+                    await self._refresh_auth_if_stale(auth_generation)
+                    return await self.request_api(
+                        path,
+                        get=get,
+                        post=post,
+                        headers=None,
+                        reauth_on_auth_error=False,
+                    )
+
+                raise ToshibaAcHttpApiAuthError(f"HTTP 401 calling {path}")
+
+            if response.status == 403:
+                raise ToshibaAcHttpApiRateLimitError(f"HTTP 403 calling {path}")
+
+            raise ToshibaAcHttpApiError(f"HTTP {response.status} calling {path}")
 
     async def connect(self) -> None:
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "User-Agent": self.USER_AGENT,
         }
         post = {"Username": self.username, "Password": self.password}
 
@@ -128,11 +225,13 @@ class ToshibaAcHttpApi:
         self.access_token = res["access_token"]
         self.access_token_type = res["token_type"]
         self.consumer_id = res["consumerId"]
+        self._auth_generation += 1
 
     async def shutdown(self) -> None:
-        if self.session:
-            await self.session.close()
-            self.session = None
+        async with self._session_lock:
+            if self.session:
+                await self.session.close()
+                self.session = None
 
     async def get_devices(self) -> t.List[ToshibaAcDeviceInfo]:
         if not self.consumer_id:
@@ -164,6 +263,8 @@ class ToshibaAcHttpApi:
         get = {
             "ACId": ac_id,
         }
+        if self.consumer_id:
+            get["consumerId"] = self.consumer_id
 
         res = await self.request_api(self.AC_STATE_PATH, get=get)
 
@@ -179,6 +280,8 @@ class ToshibaAcHttpApi:
         get = {
             "ACId": ac_id,
         }
+        if self.consumer_id:
+            get["consumerId"] = self.consumer_id
 
         res = await self.request_api(self.AC_STATE_PATH, get=get)
 
