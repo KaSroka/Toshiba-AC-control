@@ -235,6 +235,7 @@ def parse_cred():
 
 
 if __name__ == "__main__":
+
     async def main():
         app = App(*parse_cred())
         await app.start()
