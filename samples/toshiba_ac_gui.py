@@ -49,14 +49,21 @@ class App(tk.Tk):
         super().__init__()
         self.user = user
         self.password = password
+        self.refresh_interval = refresh_interval
         self.title("Toshiba AC")
         self.protocol("WM_DELETE_WINDOW", self.close)
-        self.updater_task = asyncio.get_event_loop().create_task(self.updater(refresh_interval))
+        self.updater_task = None
         self.tab_control = ttk.Notebook()
         self.devices = {}
+        self.device_manager = None
+        self.closed_event = None
+        self.closing = False
 
-        # This is called before loop is started so we can use run_until_complete
-        asyncio.get_event_loop().run_until_complete(asyncio.gather(self.init()))
+    async def start(self):
+        self.closed_event = asyncio.Event()
+        await self.init()
+        self.updater_task = asyncio.create_task(self.updater(self.refresh_interval))
+        await self.closed_event.wait()
 
     def populate_device_tab_enum(self, dev_tab, var_name, enum, setter, row):
         string_var = tk.StringVar()
@@ -176,11 +183,19 @@ class App(tk.Tk):
             await asyncio.sleep(interval)
 
     def close(self):
-        self.updater_task.cancel()
-        asyncio.get_running_loop().create_task(self.device_manager.shutdown()).add_done_callback(self.cleanup)
+        if self.closing:
+            return
+        self.closing = True
+        if self.updater_task:
+            self.updater_task.cancel()
+        asyncio.create_task(self.shutdown())
 
-    def cleanup(self, _):
-        asyncio.get_running_loop().stop()
+    async def shutdown(self):
+        if self.device_manager:
+            await self.device_manager.shutdown()
+        self.destroy()
+        if self.closed_event:
+            self.closed_event.set()
 
 
 class EnvDefault(argparse.Action):
@@ -220,6 +235,8 @@ def parse_cred():
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    app = App(*parse_cred())
-    loop.run_forever()
+    async def main():
+        app = App(*parse_cred())
+        await app.start()
+
+    asyncio.run(main())
