@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 import struct
 import typing as t
 
@@ -29,6 +30,8 @@ from toshiba_ac.device.properties import (
     ToshibaAcSwingMode,
 )
 
+LOGGER = logging.getLogger(__name__)
+
 
 class ToshibaAcFcuState:
     NONE_VAL = 0xFF
@@ -41,23 +44,31 @@ class ToshibaAcFcuState:
         def from_raw(raw: int) -> t.Optional[int]:
             raw_to_temp: t.Dict[int, t.Optional[int]] = {i: i for i in range(-128, 128)}
             raw_to_temp.update({127: None, -128: None, ToshibaAcFcuState.NONE_VAL_SIGNED: None, 126: -1})
-            return raw_to_temp[raw]
+            if raw in raw_to_temp:
+                return raw_to_temp[raw]
+            return raw
 
         @staticmethod
         def to_raw(temperature: t.Optional[int]) -> int:
             temp_to_raw: t.Dict[t.Optional[int], int] = {i: i for i in range(-128, 128)}
             temp_to_raw.update({None: ToshibaAcFcuState.NONE_VAL_SIGNED, -1: 126})
-            return temp_to_raw[temperature]
+            if temperature in temp_to_raw:
+                return temp_to_raw[temperature]
+            return ToshibaAcFcuState.NONE_VAL_SIGNED
 
     class AcStatus:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcStatus:
-            return {
+            mapping: dict[int, ToshibaAcStatus] = {
                 0x30: ToshibaAcStatus.ON,
                 0x31: ToshibaAcStatus.OFF,
                 0x02: ToshibaAcStatus.NONE,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcStatus.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw status value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcStatus.UNKNOWN
 
         @staticmethod
         def to_raw(status: ToshibaAcStatus) -> int:
@@ -65,12 +76,13 @@ class ToshibaAcFcuState:
                 ToshibaAcStatus.ON: 0x30,
                 ToshibaAcStatus.OFF: 0x31,
                 ToshibaAcStatus.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcStatus.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[status]
 
     class AcMode:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcMode:
-            return {
+            mapping: dict[int, ToshibaAcMode] = {
                 0x41: ToshibaAcMode.AUTO,
                 0x42: ToshibaAcMode.COOL,
                 0x43: ToshibaAcMode.HEAT,
@@ -78,7 +90,11 @@ class ToshibaAcFcuState:
                 0x45: ToshibaAcMode.FAN,
                 0x00: ToshibaAcMode.NONE,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcMode.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw mode value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcMode.UNKNOWN
 
         @staticmethod
         def to_raw(mode: ToshibaAcMode) -> int:
@@ -89,12 +105,13 @@ class ToshibaAcFcuState:
                 ToshibaAcMode.DRY: 0x44,
                 ToshibaAcMode.FAN: 0x45,
                 ToshibaAcMode.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcMode.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[mode]
 
     class AcFanMode:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcFanMode:
-            return {
+            mapping: dict[int, ToshibaAcFanMode] = {
                 0x41: ToshibaAcFanMode.AUTO,
                 0x31: ToshibaAcFanMode.QUIET,
                 0x32: ToshibaAcFanMode.LOW,
@@ -104,7 +121,11 @@ class ToshibaAcFcuState:
                 0x36: ToshibaAcFanMode.HIGH,
                 0x00: ToshibaAcFanMode.NONE,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcFanMode.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw fan mode value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcFanMode.UNKNOWN
 
         @staticmethod
         def to_raw(fan_mode: ToshibaAcFanMode) -> int:
@@ -117,12 +138,13 @@ class ToshibaAcFcuState:
                 ToshibaAcFanMode.MEDIUM_HIGH: 0x35,
                 ToshibaAcFanMode.HIGH: 0x36,
                 ToshibaAcFanMode.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcFanMode.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[fan_mode]
 
     class AcSwingMode:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcSwingMode:
-            return {
+            mapping: dict[int, ToshibaAcSwingMode] = {
                 0x31: ToshibaAcSwingMode.OFF,
                 0x41: ToshibaAcSwingMode.SWING_VERTICAL,
                 0x42: ToshibaAcSwingMode.SWING_HORIZONTAL,
@@ -132,9 +154,14 @@ class ToshibaAcFcuState:
                 0x52: ToshibaAcSwingMode.FIXED_3,
                 0x53: ToshibaAcSwingMode.FIXED_4,
                 0x54: ToshibaAcSwingMode.FIXED_5,
+                0x60: ToshibaAcSwingMode.HADA_CARE_FLOW,
                 0x00: ToshibaAcSwingMode.NONE,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcSwingMode.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw swing mode value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcSwingMode.UNKNOWN
 
         @staticmethod
         def to_raw(swing_mode: ToshibaAcSwingMode) -> int:
@@ -148,18 +175,24 @@ class ToshibaAcFcuState:
                 ToshibaAcSwingMode.FIXED_3: 0x52,
                 ToshibaAcSwingMode.FIXED_4: 0x53,
                 ToshibaAcSwingMode.FIXED_5: 0x54,
+                ToshibaAcSwingMode.HADA_CARE_FLOW: 0x60,
                 ToshibaAcSwingMode.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcSwingMode.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[swing_mode]
 
     class AcPowerSelection:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcPowerSelection:
-            return {
+            mapping: dict[int, ToshibaAcPowerSelection] = {
                 0x32: ToshibaAcPowerSelection.POWER_50,
                 0x4B: ToshibaAcPowerSelection.POWER_75,
                 0x64: ToshibaAcPowerSelection.POWER_100,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcPowerSelection.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw power selection value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcPowerSelection.UNKNOWN
 
         @staticmethod
         def to_raw(power_selection: ToshibaAcPowerSelection) -> int:
@@ -168,19 +201,24 @@ class ToshibaAcFcuState:
                 ToshibaAcPowerSelection.POWER_75: 0x4B,
                 ToshibaAcPowerSelection.POWER_100: 0x64,
                 ToshibaAcPowerSelection.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcPowerSelection.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[power_selection]
 
     class AcMeritB:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcMeritB:
-            return {
+            mapping: dict[int, ToshibaAcMeritB] = {
                 0x02: ToshibaAcMeritB.FIREPLACE_1,
                 0x03: ToshibaAcMeritB.FIREPLACE_2,
                 0x01: ToshibaAcMeritB.OFF,  # New value reported after update, nothing found in 3.4.0 APK version
                 0x00: ToshibaAcMeritB.OFF,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcMeritB.NONE,
                 ToshibaAcFcuState.NONE_VAL_HALF: ToshibaAcMeritB.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw merit B value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcMeritB.UNKNOWN
 
         @staticmethod
         def to_raw(merit_b: ToshibaAcMeritB) -> int:
@@ -189,12 +227,13 @@ class ToshibaAcFcuState:
                 ToshibaAcMeritB.FIREPLACE_2: 0x03,
                 ToshibaAcMeritB.OFF: 0x00,
                 ToshibaAcMeritB.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcMeritB.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[merit_b]
 
     class AcMeritA:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcMeritA:
-            return {
+            mapping: dict[int, ToshibaAcMeritA] = {
                 0x01: ToshibaAcMeritA.HIGH_POWER,
                 0x02: ToshibaAcMeritA.CDU_SILENT_1,
                 0x03: ToshibaAcMeritA.ECO,
@@ -206,7 +245,11 @@ class ToshibaAcFcuState:
                 0x00: ToshibaAcMeritA.OFF,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcMeritA.NONE,
                 ToshibaAcFcuState.NONE_VAL_HALF: ToshibaAcMeritA.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw merit A value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcMeritA.UNKNOWN
 
         @staticmethod
         def to_raw(merit_a: ToshibaAcMeritA) -> int:
@@ -221,16 +264,21 @@ class ToshibaAcFcuState:
                 ToshibaAcMeritA.CDU_SILENT_2: 0x0A,
                 ToshibaAcMeritA.OFF: 0x00,
                 ToshibaAcMeritA.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcMeritA.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[merit_a]
 
     class AcAirPureIon:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcAirPureIon:
-            return {
+            mapping: dict[int, ToshibaAcAirPureIon] = {
                 0x18: ToshibaAcAirPureIon.ON,
                 0x10: ToshibaAcAirPureIon.OFF,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcAirPureIon.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw air pure ion value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcAirPureIon.UNKNOWN
 
         @staticmethod
         def to_raw(air_pure_ion: ToshibaAcAirPureIon) -> int:
@@ -238,16 +286,21 @@ class ToshibaAcFcuState:
                 ToshibaAcAirPureIon.ON: 0x18,
                 ToshibaAcAirPureIon.OFF: 0x10,
                 ToshibaAcAirPureIon.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcAirPureIon.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[air_pure_ion]
 
     class AcSelfCleaning:
         @staticmethod
         def from_raw(raw: int) -> ToshibaAcSelfCleaning:
-            return {
+            mapping: dict[int, ToshibaAcSelfCleaning] = {
                 0x18: ToshibaAcSelfCleaning.ON,
                 0x10: ToshibaAcSelfCleaning.OFF,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcSelfCleaning.NONE,
-            }[raw]
+            }
+            if raw in mapping:
+                return mapping[raw]
+            LOGGER.warning("Unknown raw self cleaning value: 0x%02X (%d), returning UNKNOWN", raw, raw)
+            return ToshibaAcSelfCleaning.UNKNOWN
 
         @staticmethod
         def to_raw(self_cleaning: ToshibaAcSelfCleaning) -> int:
@@ -255,6 +308,7 @@ class ToshibaAcFcuState:
                 ToshibaAcSelfCleaning.ON: 0x18,
                 ToshibaAcSelfCleaning.OFF: 0x10,
                 ToshibaAcSelfCleaning.NONE: ToshibaAcFcuState.NONE_VAL,
+                ToshibaAcSelfCleaning.UNKNOWN: ToshibaAcFcuState.NONE_VAL,
             }[self_cleaning]
 
     @classmethod
