@@ -27,6 +27,7 @@ class ToshibaAcDeviceEnergyConsumption:
 class ToshibaAcStatus(Enum):
     ON = auto()
     OFF = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -36,6 +37,7 @@ class ToshibaAcMode(Enum):
     HEAT = auto()
     DRY = auto()
     FAN = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -47,6 +49,7 @@ class ToshibaAcFanMode(Enum):
     MEDIUM = auto()
     MEDIUM_HIGH = auto()
     HIGH = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -60,6 +63,8 @@ class ToshibaAcSwingMode(Enum):
     FIXED_3 = auto()
     FIXED_4 = auto()
     FIXED_5 = auto()
+    HADA_CARE_FLOW = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -67,6 +72,7 @@ class ToshibaAcPowerSelection(Enum):
     POWER_50 = auto()
     POWER_75 = auto()
     POWER_100 = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -74,6 +80,7 @@ class ToshibaAcMeritB(Enum):
     FIREPLACE_1 = auto()
     FIREPLACE_2 = auto()
     OFF = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
@@ -87,16 +94,19 @@ class ToshibaAcMeritA(Enum):
     COMFORT = auto()
     CDU_SILENT_2 = auto()
     OFF = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
 class ToshibaAcAirPureIon(Enum):
     OFF = auto()
     ON = auto()
+    UNKNOWN = auto()
     NONE = None
 
 
 class ToshibaAcSelfCleaning(Enum):
     ON = auto()
     OFF = auto()
+    UNKNOWN = auto()
     NONE = None
