@@ -160,7 +160,9 @@ class App(tk.Tk):
         self.update_ac_state(self.devices[dev])
 
     async def init(self):
-        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, "3e6e4eb5f0e5aa40", brand_id=self.brand_id)
+        self.device_manager = ToshibaAcDeviceManager(
+            self.user, self.password, "3e6e4eb5f0e5aa40", brand_id=self.brand_id
+        )
         await self.device_manager.connect()
 
         devices = await self.device_manager.get_devices()
