@@ -69,9 +69,10 @@ class ToshibaAcHttpApi:
     AC_STATE_PATH = "/api/AC/GetCurrentACState"
     AC_ENERGY_CONSUMPTION_PATH = "/api/AC/GetGroupACEnergyConsumption"
 
-    def __init__(self, username: str, password: str) -> None:
+    def __init__(self, username: str, password: str, brand_id: t.Optional[str] = None) -> None:
         self.username = username
         self.password = password
+        self.brand_id = brand_id
         self.access_token: t.Optional[str] = None
         self.access_token_type: t.Optional[str] = None
         self.consumer_id: t.Optional[str] = None
@@ -218,7 +219,9 @@ class ToshibaAcHttpApi:
             "Content-Type": "application/json",
             "User-Agent": self.USER_AGENT,
         }
-        post = {"Username": self.username, "Password": self.password}
+        post: dict[str, str] = {"Username": self.username, "Password": self.password}
+        if self.brand_id:
+            post["BrandId"] = self.brand_id
 
         res = await self.request_api(self.LOGIN_PATH, post=post, headers=headers)
 

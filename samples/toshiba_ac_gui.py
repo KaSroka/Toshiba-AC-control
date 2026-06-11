@@ -45,10 +45,11 @@ class DeviceTab:
 
 
 class App(tk.Tk):
-    def __init__(self, user, password, refresh_interval=1 / 20):
+    def __init__(self, user, password, brand_id=None, refresh_interval=1 / 20):
         super().__init__()
         self.user = user
         self.password = password
+        self.brand_id = brand_id
         self.refresh_interval = refresh_interval
         self.title("Toshiba AC")
         self.protocol("WM_DELETE_WINDOW", self.close)
@@ -159,7 +160,7 @@ class App(tk.Tk):
         self.update_ac_state(self.devices[dev])
 
     async def init(self):
-        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, "3e6e4eb5f0e5aa40")
+        self.device_manager = ToshibaAcDeviceManager(self.user, self.password, "3e6e4eb5f0e5aa40", brand_id=self.brand_id)
         await self.device_manager.connect()
 
         devices = await self.device_manager.get_devices()
@@ -228,16 +229,26 @@ def parse_cred():
         envvar="TOSHIBA_PASS",
         help="Toshiba Home AC password (can also be specified using TOSHIBA_PASS environment variable)",
     )
+    parser.add_argument(
+        "--brand-id",
+        metavar="brand_id",
+        dest="brand_id",
+        action=EnvDefault,
+        envvar="TOSHIBA_BRAND_ID",
+        required=False,
+        help="Toshiba brand ID (can also be specified using TOSHIBA_BRAND_ID environment variable)",
+    )
 
     cred = parser.parse_args()
 
-    return cred.user, cred.password
+    return cred.user, cred.password, cred.brand_id
 
 
 if __name__ == "__main__":
 
     async def main():
-        app = App(*parse_cred())
+        user, password, brand_id = parse_cred()
+        app = App(user, password, brand_id=brand_id)
         await app.start()
 
     asyncio.run(main())
