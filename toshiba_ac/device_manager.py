@@ -41,9 +41,11 @@ class ToshibaAcDeviceManager:
         password: str,
         device_id: t.Optional[str] = None,
         sas_token: t.Optional[str] = None,
+        brand_id: t.Optional[str] = None,
     ):
         self.username = username
         self.password = password
+        self.brand_id = brand_id
         self.http_api: t.Optional[ToshibaAcHttpApi] = None
         self.reg_info = None
         self.amqp_api: t.Optional[ToshibaAcAmqpApi] = None
@@ -59,7 +61,7 @@ class ToshibaAcDeviceManager:
         try:
             async with self.lock:
                 if not self.http_api:
-                    self.http_api = ToshibaAcHttpApi(self.username, self.password)
+                    self.http_api = ToshibaAcHttpApi(self.username, self.password, self.brand_id)
                     await self.http_api.connect()
 
                 if not self.sas_token:
