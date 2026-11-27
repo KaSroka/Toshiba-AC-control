@@ -134,7 +134,8 @@ class ToshibaAcFcuState:
                 0x54: ToshibaAcSwingMode.FIXED_5,
                 0x00: ToshibaAcSwingMode.NONE,
                 ToshibaAcFcuState.NONE_VAL: ToshibaAcSwingMode.NONE,
-            }[raw]
+                # Unknown louver modes (0x60, HDA) must not break the device
+            }.get(raw, ToshibaAcSwingMode.NONE)
 
         @staticmethod
         def to_raw(swing_mode: ToshibaAcSwingMode) -> int:
